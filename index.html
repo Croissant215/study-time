@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>스마트 공부 시간 예측기 | Study Time Estimator</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header Navbar -->
+    <header class="app-header">
+      <div class="logo">
+        <i class="fa-solid fa-brain"></i>
+        <span>StudyPredict</span>
+      </div>
+      <nav class="nav-tabs">
+        <button class="tab-btn active" data-tab="estimator">
+          <i class="fa-solid fa-calculator"></i> 공부 시간 예측
+        </button>
+        <button class="tab-btn" data-tab="presets">
+          <i class="fa-solid fa-book-bookmark"></i> 교재 프리셋
+        </button>
+        <button class="tab-btn" data-tab="analytics">
+          <i class="fa-solid fa-chart-line"></i> 오차 분석 & 기록
+        </button>
+      </nav>
+      <span class="badge badge-accent"><i class="fa-solid fa-bolt"></i> 웹 내장 AI 100% 자동</span>
+    </header>
+
+    <!-- 사용자 프로필 바 -->
+    <div id="user-profile-bar" class="profile-summary-bar">
+      <div class="profile-info">
+        <i class="fa-solid fa-user-gear"></i>
+        <span><strong id="bar-user-name">열공이</strong> 님의 학습 프로필: </span>
+        <span id="bar-skill-level" class="badge badge-accent">실력 레벨: 보통 (1.0x)</span>
+      </div>
+      <button type="button" id="btn-re-onboard" class="btn btn-secondary btn-sm">
+        <i class="fa-solid fa-sliders"></i> 실력 진단 재설정
+      </button>
+    </div>
+
+    <main class="app-content">
+      <!-- TAB 1: 공부 시간 예측 & 타이머 -->
+      <section id="tab-estimator" class="tab-content active">
+        <div class="grid-2col">
+          <!-- 좌측: 입력 폼 -->
+          <div class="card glass-card">
+            <div class="card-header">
+              <h2><i class="fa-solid fa-pen-ruler"></i> 학습 세션 입력</h2>
+              <span class="badge badge-accent"><i class="fa-solid fa-brain"></i> 내장 스마트 AI 분석</span>
+            </div>
+
+            <form id="study-form" onsubmit="event.preventDefault();">
+              <!-- 교재 선택/입력 -->
+              <div class="form-group">
+                <label for="book-title">교재명 또는 과목명</label>
+                <div class="input-with-action">
+                  <input type="text" id="book-title" placeholder="예: 쎈 수학 I, EBS 수능특강 영어, 블랙라벨, 현우진 드릴..." autocomplete="off">
+                  <button type="button" id="btn-select-preset" class="btn btn-secondary btn-icon" title="프리셋에서 불러오기">
+                    <i class="fa-solid fa-bookmark"></i>
+                  </button>
+                </div>
+                <div id="preset-dropdown" class="dropdown-menu hidden"></div>
+                <small id="auto-analysis-tag" class="hint-tag"><i class="fa-solid fa-wand-magic-sparkles"></i> 교재명을 입력하면 웹 스마트 AI가 자동으로 즉시 파싱합니다.</small>
+              </div>
+
+              <!-- 문제 수 -->
+              <div class="form-group">
+                <label for="problem-count">풀 문제 수</label>
+                <div class="number-input-group">
+                  <button type="button" class="btn-num" onclick="adjustCount(-5)">-5</button>
+                  <button type="button" class="btn-num" onclick="adjustCount(-1)">-1</button>
+                  <input type="number" id="problem-count" value="20" min="1" max="300">
+                  <button type="button" class="btn-num" onclick="adjustCount(+1)">+1</button>
+                  <button type="button" class="btn-num" onclick="adjustCount(+5)">+5</button>
+                </div>
+              </div>
+
+              <!-- 난이도 조율 슬라이더 -->
+              <div class="form-group">
+                <div class="label-row">
+                  <label for="difficulty-weight">교재 난이도 가중치</label>
+                  <span id="difficulty-badge" class="badge badge-medium">보통 (1.5x)</span>
+                </div>
+                <input type="range" id="difficulty-weight" min="0.8" max="3.0" step="0.1" value="1.5">
+                <div class="slider-labels">
+                  <span style="left: 9.09%;">개념/기초 (1.0x)</span>
+                  <span style="left: 31.82%;">유형 (1.5x)</span>
+                  <span style="left: 54.55%;">준심화/마플 (2.0x)</span>
+                  <span style="left: 77.27%;">심화 (2.5x)</span>
+                  <span style="left: 100%; transform: translateX(-100%);">킬러 (3.0x)</span>
+                </div>
+
+              </div>
+
+              <!-- 오답률 & 복습 시간 -->
+              <div class="form-row 2col-row">
+                <div class="form-group">
+                  <div class="label-row">
+                    <label for="error-rate">예상 오답률 (%)</label>
+                    <span id="error-rate-val" class="val-highlight">20%</span>
+                  </div>
+                  <input type="range" id="error-rate" min="0" max="80" step="5" value="20">
+                </div>
+                <div class="form-group">
+                  <label for="wrong-review-time">오답 1개당 정리 시간(분)</label>
+                  <input type="number" id="wrong-review-time" value="5" min="1" max="30">
+                </div>
+              </div>
+
+              <!-- 사용자 보정 알파 값 안내 -->
+              <div class="correction-info-box">
+                <i class="fa-solid fa-sliders"></i>
+                <div>
+                  <strong>실력 가중치: <span id="skill-mult-val">1.0x</span> | 오차 보정 알파 ($\alpha$): <span id="alpha-val">1.00</span></strong>
+                  <p>사용자 온보딩 실력과 과거 측정 기록을 바탕으로 자동 보정됩니다.</p>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <!-- 우측: 예측 결과 & 타이머 -->
+          <div class="card glass-card result-card">
+            <!-- 예측 결과 디스플레이 -->
+            <div id="estimation-result-panel">
+              <div class="card-header">
+                <h2><i class="fa-solid fa-stopwatch"></i> 예상 공부 시간</h2>
+              </div>
+              <div class="result-display">
+                <div class="total-time-box">
+                  <span class="sub-label">총 예상 소요 시간</span>
+                  <div class="big-time" id="predicted-total-time">00시간 00분</div>
+                </div>
+                
+                <div class="time-breakdown-grid">
+                  <div class="breakdown-item">
+                    <i class="fa-solid fa-pencil"></i>
+                    <div>
+                      <span>순수 문제 풀이</span>
+                      <strong id="predicted-solve-time">0분</strong>
+                    </div>
+                  </div>
+                  <div class="breakdown-item">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <div>
+                      <span>오답 복습 & 정리</span>
+                      <strong id="predicted-review-time">0분</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 공부 시작 모드 버튼 -->
+              <div class="action-btn-group">
+                <button type="button" id="btn-start-timer" class="btn btn-primary btn-large">
+                  <i class="fa-solid fa-play"></i> ⏱️ 타이머 틀고 공부 시작
+                </button>
+                <button type="button" id="btn-manual-finish" class="btn btn-secondary btn-large">
+                  <i class="fa-solid fa-file-pen"></i> 📝 나중에 완료 및 기록
+                </button>
+              </div>
+            </div>
+
+            <!-- 스톱워치/타이머 패널 (초기 숨김) -->
+            <div id="active-timer-panel" class="hidden">
+              <div class="timer-header">
+                <span id="active-book-display" class="active-book-title">쎈 수학 I (20문제)</span>
+                <span class="badge badge-live">LIVE STUDYING</span>
+              </div>
+              <div class="timer-circle-wrap">
+                <div class="timer-digital" id="timer-display">00:00:00</div>
+                <div class="timer-sub-text">목표 예상 시간: <span id="timer-target-time">75분</span></div>
+              </div>
+              <div class="timer-controls">
+                <button type="button" id="btn-pause-timer" class="btn btn-warning">
+                  <i class="fa-solid fa-pause"></i> 일시정지
+                </button>
+                <button type="button" id="btn-stop-timer" class="btn btn-success btn-large">
+                  <i class="fa-solid fa-flag-checkered"></i> 공부 완료 및 오차 기록
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: 교재 프리셋 관리 -->
+      <section id="tab-presets" class="tab-content">
+        <div class="card glass-card">
+          <div class="card-header">
+            <h2><i class="fa-solid fa-book-bookmark"></i> 교재 및 과목 프리셋 관리</h2>
+            <button type="button" id="btn-open-add-preset" class="btn btn-primary btn-sm">
+              <i class="fa-solid fa-plus"></i> 새 교재 등록
+            </button>
+          </div>
+          <p class="subtitle">자주 푸는 교재를 등록해 두면 난이도와 보정 가중치가 자동으로 저장됩니다.</p>
+          <div id="preset-list-grid" class="preset-grid"></div>
+        </div>
+      </section>
+
+      <!-- TAB 3: 오차 분석 & 학습 기록 -->
+      <section id="tab-analytics" class="tab-content">
+        <div class="card glass-card">
+          <div class="card-header">
+            <h2><i class="fa-solid fa-chart-line"></i> 예측 오차 리포트 & 과거 기록</h2>
+          </div>
+
+          <div class="analytics-summary-grid">
+            <div class="stat-card">
+              <span class="stat-title">총 완료 세션</span>
+              <strong id="stat-total-count">0회</strong>
+            </div>
+            <div class="stat-card">
+              <span class="stat-title">평균 오차 정확도</span>
+              <strong id="stat-accuracy">100%</strong>
+            </div>
+            <div class="stat-card">
+              <span class="stat-title">누적 학습 시간</span>
+              <strong id="stat-total-hours">0시간</strong>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th>날짜</th>
+                  <th>교재명</th>
+                  <th>문제 수</th>
+                  <th>예측 시간</th>
+                  <th>실제 시간</th>
+                  <th>오답 수</th>
+                  <th>오차율</th>
+                  <th>관리</th>
+                </tr>
+              </thead>
+              <tbody id="history-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- 모달: 온보딩 사용자 기초 실력 진단 -->
+  <div id="onboarding-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-user-graduate"></i> 사용자 기초 실력 진단 온보딩</h3>
+      </div>
+      <div class="modal-body">
+        <p class="subtitle" style="margin-bottom:16px;">맞춤형 공부 시간을 정확하게 예측하기 위해 초기 실력과 학습 습관을 알려주세요.</p>
+        
+        <div class="form-group">
+          <label for="onboard-user-name">사용자 이름 / 닉네임</label>
+          <input type="text" id="onboard-user-name" placeholder="예: 열공이" value="열공이">
+        </div>
+
+        <div class="form-group">
+          <label>과목별/학습 기초 실력 수준</label>
+          <div style="display:flex; flex-direction:column; gap:10px; margin-top:8px;">
+            <label style="font-weight:normal; cursor:pointer;">
+              <input type="radio" name="onboard-skill" value="1.35"> 🐣 **노베이스/기초 부족** (속도 가중치 1.35x - 풀이에 시간이 더 소요됨)
+            </label>
+            <label style="font-weight:normal; cursor:pointer;">
+              <input type="radio" name="onboard-skill" value="1.0" checked> 🐥 **보통/중위권** (속도 가중치 1.0x - 표준 풀이 속도)
+            </label>
+            <label style="font-weight:normal; cursor:pointer;">
+              <input type="radio" name="onboard-skill" value="0.75"> 🦅 **상위권/문제 풀이 빠름** (속도 가중치 0.75x - 빠르게 해결)
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="btn-save-onboarding" class="btn btn-primary btn-large">🚀 진단 완료 및 공부시간 예측 시작</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 모달: 공부 완료 & 피드백 입력 -->
+  <div id="feedback-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-square-poll-vertical"></i> 공부 세션 완료 피드백</h3>
+        <button type="button" class="btn-close" onclick="closeFeedbackModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <p id="modal-session-info" class="session-summary-text">교재: 쎈 수학 I (20문제)</p>
+
+        <div class="form-group">
+          <label for="actual-time-input">실제 걸린 시간 (분)</label>
+          <input type="number" id="actual-time-input" min="1" max="1440" placeholder="예: 85">
+        </div>
+
+        <div class="form-group">
+          <label for="actual-wrong-input">실제 틀린 문제 수 (개)</label>
+          <input type="number" id="actual-wrong-input" min="0" max="300" value="3">
+        </div>
+
+        <div class="modal-impact-preview">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <span>이 기록은 다음 세션의 시간 예측을 **더 정확하게 보정**하는 데 반영됩니다.</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="btn-secondary-close" class="btn btn-secondary" onclick="closeFeedbackModal()">취소</button>
+        <button type="button" id="btn-submit-feedback" class="btn btn-primary">저장 및 오차 보정 반영</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 모달: 교재 프리셋 추가 -->
+  <div id="preset-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-book"></i> 새 교재 프리셋 등록</h3>
+        <button type="button" class="btn-close" onclick="closePresetModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="new-preset-title">교재명</label>
+          <input type="text" id="new-preset-title" placeholder="예: 자이스토리 수능 수학">
+        </div>
+        <div class="form-group">
+          <label for="new-preset-subject">과목</label>
+          <input type="text" id="new-preset-subject" placeholder="예: 수학, 영어, 국어">
+        </div>
+        <div class="form-group">
+          <label for="new-preset-difficulty">난이도</label>
+          <select id="new-preset-difficulty">
+            <option value="1.0">개념/기초 (1.0x)</option>
+            <option value="1.5" selected>유형/실전 (1.5x)</option>
+            <option value="2.5">심화/고난도 (2.5x)</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closePresetModal()">취소</button>
+        <button type="button" id="btn-save-preset" class="btn btn-primary">등록하기</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
