@@ -1,5 +1,5 @@
 /**
- * Study Time Estimator - Pure JavaScript Engine with Supabase Crowdsourced Cloud Integration
+ * Study Time Estimator - Pure JavaScript Engine with Robust Null Safety
  */
 
 // Global State
@@ -24,9 +24,6 @@ const state = {
     url: 'https://ioyjbdhkzyatgurqvsmz.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlveWpiZGhrenlhdGd1cnF2c216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMjc4OTMsImV4cCI6MjEwMDgwMzg5M30.noBv8DJtCmoL5JpBniS2HkvPd-rpW1Vqgnt69JKwJUo'
   },
-
-
-
   supabaseClient: null,
   timer: {
     intervalId: null,
@@ -137,29 +134,33 @@ function initSupabaseClient() {
   if (state.supabaseConfig.url && state.supabaseConfig.anonKey && window.supabase) {
     try {
       state.supabaseClient = window.supabase.createClient(state.supabaseConfig.url, state.supabaseConfig.anonKey);
-      DOM.supabaseStatusBadge.innerHTML = `<i class="fa-solid fa-cloud-check" style="color:var(--secondary)"></i> Supabase Cloud: 자동 연결됨`;
+      if (DOM.supabaseStatusBadge) {
+        DOM.supabaseStatusBadge.innerHTML = `<i class="fa-solid fa-cloud-check" style="color:var(--secondary)"></i> Supabase Cloud: 자동 연결됨`;
+      }
     } catch (e) {
-      DOM.supabaseStatusBadge.innerHTML = `<i class="fa-solid fa-cloud" style="color:var(--text-muted)"></i> Supabase Cloud: 연결 대기`;
+      if (DOM.supabaseStatusBadge) {
+        DOM.supabaseStatusBadge.innerHTML = `<i class="fa-solid fa-cloud" style="color:var(--text-muted)"></i> Supabase Cloud: 연결 대기`;
+      }
     }
   } else {
-    DOM.supabaseStatusBadge.innerHTML = `<i class="fa-solid fa-cloud" style="color:var(--text-muted)"></i> Supabase Cloud: 연결 대기`;
+    if (DOM.supabaseStatusBadge) {
+      DOM.supabaseStatusBadge.innerHTML = `<i class="fa-solid fa-cloud" style="color:var(--text-muted)"></i> Supabase Cloud: 연결 대기`;
+    }
   }
 }
 
-
-
-
 function openSupabaseModal() {
-  DOM.supabaseUrlInput.value = state.supabaseConfig.url || '';
-  DOM.supabaseAnonKeyInput.value = state.supabaseConfig.anonKey || '';
-  DOM.supabaseModal.classList.remove('hidden');
+  if (DOM.supabaseUrlInput) DOM.supabaseUrlInput.value = state.supabaseConfig.url || '';
+  if (DOM.supabaseAnonKeyInput) DOM.supabaseAnonKeyInput.value = state.supabaseConfig.anonKey || '';
+  DOM.supabaseModal?.classList.remove('hidden');
 }
 
 function closeSupabaseModal() {
-  DOM.supabaseModal.classList.add('hidden');
+  DOM.supabaseModal?.classList.add('hidden');
 }
 
 function saveSupabaseConfig() {
+  if (!DOM.supabaseUrlInput || !DOM.supabaseAnonKeyInput) return;
   const url = DOM.supabaseUrlInput.value.trim();
   const anonKey = DOM.supabaseAnonKeyInput.value.trim();
 
@@ -172,7 +173,7 @@ function saveSupabaseConfig() {
 
 function checkOnboarding() {
   if (!state.profile) {
-    DOM.onboardingModal.classList.remove('hidden');
+    DOM.onboardingModal?.classList.remove('hidden');
   } else {
     updateProfileBar();
   }
@@ -189,16 +190,16 @@ function saveOnboarding() {
 
   state.profile = { name, skillMult, skillLabel };
   localStorage.setItem('study_user_profile', JSON.stringify(state.profile));
-  DOM.onboardingModal.classList.add('hidden');
+  DOM.onboardingModal?.classList.add('hidden');
   updateProfileBar();
   recalculatePrediction();
 }
 
 function updateProfileBar() {
   if (state.profile) {
-    DOM.barUserName.textContent = state.profile.name;
-    DOM.barSkillLevel.textContent = `실력 레벨: ${state.profile.skillLabel}`;
-    DOM.skillMultVal.textContent = `${state.profile.skillMult}x`;
+    if (DOM.barUserName) DOM.barUserName.textContent = state.profile.name;
+    if (DOM.barSkillLevel) DOM.barSkillLevel.textContent = `실력 레벨: ${state.profile.skillLabel}`;
+    if (DOM.skillMultVal) DOM.skillMultVal.textContent = `${state.profile.skillMult}x`;
   }
 }
 
@@ -208,25 +209,25 @@ function setupEventListeners() {
       DOM.tabs.forEach(t => t.classList.remove('active'));
       DOM.tabContents.forEach(c => c.classList.remove('active'));
       tab.classList.add('active');
-      document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+      document.getElementById(`tab-${tab.dataset.tab}`)?.classList.add('active');
     });
   });
 
-  DOM.btnOpenSupabaseConfig.addEventListener('click', openSupabaseModal);
-  DOM.btnSaveSupabaseConfig.addEventListener('click', saveSupabaseConfig);
+  if (DOM.btnOpenSupabaseConfig) DOM.btnOpenSupabaseConfig.addEventListener('click', openSupabaseModal);
+  if (DOM.btnSaveSupabaseConfig) DOM.btnSaveSupabaseConfig.addEventListener('click', saveSupabaseConfig);
 
-  DOM.btnSaveOnboarding.addEventListener('click', saveOnboarding);
-  DOM.btnReOnboard.addEventListener('click', () => DOM.onboardingModal.classList.remove('hidden'));
+  DOM.btnSaveOnboarding?.addEventListener('click', saveOnboarding);
+  DOM.btnReOnboard?.addEventListener('click', () => DOM.onboardingModal?.classList.remove('hidden'));
 
-  DOM.btnExportData.addEventListener('click', exportData);
-  DOM.importFileInput.addEventListener('change', importData);
+  DOM.btnExportData?.addEventListener('click', exportData);
+  DOM.importFileInput?.addEventListener('change', importData);
 
-  DOM.bookTitleInput.addEventListener('input', (e) => {
+  DOM.bookTitleInput?.addEventListener('input', (e) => {
     const title = e.target.value.trim();
     clearTimeout(state.debounceTimer);
     
     if (!title) {
-      DOM.autoAnalysisTag.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> 교재명을 입력하면 웹 스마트 AI가 자동으로 즉시 파싱합니다.`;
+      if (DOM.autoAnalysisTag) DOM.autoAnalysisTag.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> 교재명을 입력하면 웹 스마트 AI가 자동으로 즉시 파싱합니다.`;
       recalculatePrediction();
       return;
     }
@@ -237,27 +238,27 @@ function setupEventListeners() {
     }, 200);
   });
 
-  DOM.btnSelectPreset.addEventListener('click', togglePresetDropdown);
-  DOM.problemCountInput.addEventListener('input', recalculatePrediction);
-  DOM.difficultySlider.addEventListener('input', (e) => {
+  DOM.btnSelectPreset?.addEventListener('click', togglePresetDropdown);
+  DOM.problemCountInput?.addEventListener('input', recalculatePrediction);
+  DOM.difficultySlider?.addEventListener('input', (e) => {
     updateDifficultyBadge(parseFloat(e.target.value));
     recalculatePrediction();
   });
-  DOM.errorRateSlider.addEventListener('input', (e) => {
-    DOM.errorRateVal.textContent = `${e.target.value}%`;
+  DOM.errorRateSlider?.addEventListener('input', (e) => {
+    if (DOM.errorRateVal) DOM.errorRateVal.textContent = `${e.target.value}%`;
     recalculatePrediction();
   });
-  DOM.wrongReviewTimeInput.addEventListener('input', recalculatePrediction);
-  DOM.enablePomodoro.addEventListener('change', recalculatePrediction);
+  DOM.wrongReviewTimeInput?.addEventListener('input', recalculatePrediction);
+  DOM.enablePomodoro?.addEventListener('change', recalculatePrediction);
 
-  DOM.btnStartTimer.addEventListener('click', startTimerSession);
-  DOM.btnManualFinish.addEventListener('click', openManualFinishModal);
-  DOM.btnPauseTimer.addEventListener('click', togglePauseTimer);
-  DOM.btnStopTimer.addEventListener('click', stopTimerSession);
+  DOM.btnStartTimer?.addEventListener('click', startTimerSession);
+  DOM.btnManualFinish?.addEventListener('click', openManualFinishModal);
+  DOM.btnPauseTimer?.addEventListener('click', togglePauseTimer);
+  DOM.btnStopTimer?.addEventListener('click', stopTimerSession);
 
-  DOM.btnSubmitFeedback.addEventListener('click', submitSessionFeedback);
-  DOM.btnOpenAddPreset.addEventListener('click', () => DOM.presetModal.classList.remove('hidden'));
-  DOM.btnSavePreset.addEventListener('click', saveNewPreset);
+  DOM.btnSubmitFeedback?.addEventListener('click', submitSessionFeedback);
+  DOM.btnOpenAddPreset?.addEventListener('click', () => DOM.presetModal?.classList.remove('hidden'));
+  DOM.btnSavePreset?.addEventListener('click', saveNewPreset);
 }
 
 // Supabase Global Crowdsourced Fetching
@@ -273,11 +274,12 @@ async function fetchGlobalDifficultyFromSupabase(bookTitle) {
 
     if (error || !data || data.length === 0) return;
 
-    // Calculate Crowdsourced Global Average Difficulty Weight
     const avgMinsPerProblem = data.reduce((acc, row) => acc + (row.actual_min / Math.max(1, row.problem_count)), 0) / data.length;
     const globalWeight = Math.max(0.8, Math.min(3.0, avgMinsPerProblem / 2.5));
 
-    DOM.autoAnalysisTag.innerHTML = `<i class="fa-solid fa-globe" style="color:var(--primary)"></i> <strong>Supabase 집단지성 ${data.length}건 데이터 반영:</strong> [${bookTitle}] 글로벌 난이도 가중치 (${globalWeight.toFixed(1)}x)`;
+    if (DOM.autoAnalysisTag) {
+      DOM.autoAnalysisTag.innerHTML = `<i class="fa-solid fa-globe" style="color:var(--primary)"></i> <strong>Supabase 집단지성 ${data.length}건 데이터 반영:</strong> [${bookTitle}] 글로벌 난이도 가중치 (${globalWeight.toFixed(1)}x)`;
+    }
     setSliderAndBadge(globalWeight);
     recalculatePrediction();
   } catch (err) {
@@ -344,7 +346,7 @@ function runBuiltInSmartAIClassifier(bookTitle) {
 
   const existingPreset = state.presets.find(p => p.title.toLowerCase() === lowerTitle);
   if (existingPreset) {
-    DOM.autoAnalysisTag.innerHTML = `<i class="fa-solid fa-circle-check" style="color:var(--secondary)"></i> 저장된 교재 프리셋 [${existingPreset.title}] 적용`;
+    if (DOM.autoAnalysisTag) DOM.autoAnalysisTag.innerHTML = `<i class="fa-solid fa-circle-check" style="color:var(--secondary)"></i> 저장된 교재 프리셋 [${existingPreset.title}] 적용`;
     setSliderAndBadge(existingPreset.difficulty_weight);
     recalculatePrediction();
     return;
@@ -353,7 +355,7 @@ function runBuiltInSmartAIClassifier(bookTitle) {
   for (const category of SMART_AI_DATABASE) {
     for (const kw of category.keywords) {
       if (lowerTitle.includes(kw.toLowerCase())) {
-        DOM.autoAnalysisTag.innerHTML = `<i class="fa-solid fa-brain" style="color:var(--primary)"></i> <strong>웹 내장 AI 분석:</strong> ${category.reason} (${category.weight}x)`;
+        if (DOM.autoAnalysisTag) DOM.autoAnalysisTag.innerHTML = `<i class="fa-solid fa-brain" style="color:var(--primary)"></i> <strong>웹 내장 AI 분석:</strong> ${category.reason} (${category.weight}x)`;
         setSliderAndBadge(category.weight);
         recalculatePrediction();
         return;
@@ -361,18 +363,18 @@ function runBuiltInSmartAIClassifier(bookTitle) {
     }
   }
 
-  DOM.autoAnalysisTag.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> <strong>웹 내장 AI 추론:</strong> 일반 학습 교재 패턴으로 분석되었습니다. (1.3x)`;
+  if (DOM.autoAnalysisTag) DOM.autoAnalysisTag.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> <strong>웹 내장 AI 추론:</strong> 일반 학습 교재 패턴으로 분석되었습니다. (1.3x)`;
   setSliderAndBadge(1.3);
   recalculatePrediction();
 }
 
 function setSliderAndBadge(weight) {
-  DOM.difficultySlider.value = weight;
+  if (DOM.difficultySlider) DOM.difficultySlider.value = weight;
   updateDifficultyBadge(weight);
 }
 
 function updateDifficultyBadge(weight) {
-  DOM.difficultyBadge.textContent = `${getTierLabel(weight)} (${weight.toFixed(1)}x)`;
+  if (DOM.difficultyBadge) DOM.difficultyBadge.textContent = `${getTierLabel(weight)} (${weight.toFixed(1)}x)`;
 }
 
 function getTierLabel(weight) {
@@ -393,6 +395,7 @@ function getSubjectFromTitle(title) {
 }
 
 function adjustCount(delta) {
+  if (!DOM.problemCountInput) return;
   const current = parseInt(DOM.problemCountInput.value) || 0;
   const next = Math.max(1, Math.min(300, current + delta));
   DOM.problemCountInput.value = next;
@@ -400,13 +403,13 @@ function adjustCount(delta) {
 }
 
 function calculatePrediction() {
-  const problemCount = parseInt(DOM.problemCountInput.value) || 1;
-  const difficultyWeight = parseFloat(DOM.difficultySlider.value) || 1.5;
-  const errorRatePercent = parseFloat(DOM.errorRateSlider.value) || 20;
-  const wrongReviewTimeMin = parseInt(DOM.wrongReviewTimeInput.value) || 5;
-  const isPomodoro = DOM.enablePomodoro.checked;
+  const problemCount = parseInt(DOM.problemCountInput?.value) || 1;
+  const difficultyWeight = parseFloat(DOM.difficultySlider?.value) || 1.5;
+  const errorRatePercent = parseFloat(DOM.errorRateSlider?.value) || 20;
+  const wrongReviewTimeMin = parseInt(DOM.wrongReviewTimeInput?.value) || 5;
+  const isPomodoro = DOM.enablePomodoro ? DOM.enablePomodoro.checked : true;
 
-  const bookTitle = DOM.bookTitleInput.value.trim() || '일반';
+  const bookTitle = DOM.bookTitleInput ? DOM.bookTitleInput.value.trim() || '일반' : '일반';
   const subject = getSubjectFromTitle(bookTitle);
   
   const skillMult = state.profile ? state.profile.skillMult : 1.0;
@@ -447,13 +450,13 @@ function recalculatePrediction() {
   const mins = pred.totalPredictedMin % 60;
   const timeFormatted = hours > 0 ? `${hours}시간 ${mins}분` : `${mins}분`;
 
-  DOM.predictedTotalTime.textContent = timeFormatted;
-  DOM.predictedSolveTime.textContent = `${pred.solveMin}분`;
-  DOM.predictedReviewTime.textContent = `${pred.reviewMin}분`;
-  DOM.predictedRestTime.textContent = `${pred.restMin}분`;
-  DOM.alphaValDisplay.textContent = pred.alpha.toFixed(2);
+  if (DOM.predictedTotalTime) DOM.predictedTotalTime.textContent = timeFormatted;
+  if (DOM.predictedSolveTime) DOM.predictedSolveTime.textContent = `${pred.solveMin}분`;
+  if (DOM.predictedReviewTime) DOM.predictedReviewTime.textContent = `${pred.reviewMin}분`;
+  if (DOM.predictedRestTime) DOM.predictedRestTime.textContent = `${pred.restMin}분`;
+  if (DOM.alphaValDisplay) DOM.alphaValDisplay.textContent = pred.alpha.toFixed(2);
   
-  if (state.profile) {
+  if (state.profile && DOM.skillMultVal) {
     DOM.skillMultVal.textContent = `${state.profile.skillMult}x`;
   }
 
@@ -461,6 +464,7 @@ function recalculatePrediction() {
 }
 
 function calculateTargetClock(totalPredictedMin) {
+  if (!DOM.targetFinishClock) return;
   const now = new Date();
   const finishTime = new Date(now.getTime() + totalPredictedMin * 60 * 1000);
 
@@ -475,6 +479,7 @@ function calculateTargetClock(totalPredictedMin) {
 }
 
 function togglePresetDropdown() {
+  if (!DOM.presetDropdown) return;
   if (DOM.presetDropdown.classList.contains('hidden')) {
     renderPresetDropdown();
     DOM.presetDropdown.classList.remove('hidden');
@@ -484,6 +489,7 @@ function togglePresetDropdown() {
 }
 
 function renderPresetDropdown() {
+  if (!DOM.presetDropdown) return;
   if (state.presets.length === 0) {
     DOM.presetDropdown.innerHTML = `<div style="padding:10px; color:var(--text-muted)">등록된 프리셋이 없습니다.</div>`;
     return;
@@ -500,15 +506,15 @@ function selectPreset(presetId) {
   const preset = state.presets.find(p => p.id === presetId);
   if (!preset) return;
 
-  DOM.bookTitleInput.value = preset.title;
+  if (DOM.bookTitleInput) DOM.bookTitleInput.value = preset.title;
   setSliderAndBadge(preset.difficulty_weight);
-  DOM.autoAnalysisTag.innerHTML = `<i class="fa-solid fa-circle-check" style="color:var(--secondary)"></i> 프리셋 [${preset.title}] 선택됨`;
-  DOM.presetDropdown.classList.add('hidden');
+  if (DOM.autoAnalysisTag) DOM.autoAnalysisTag.innerHTML = `<i class="fa-solid fa-circle-check" style="color:var(--secondary)"></i> 프리셋 [${preset.title}] 선택됨`;
+  if (DOM.presetDropdown) DOM.presetDropdown.classList.add('hidden');
   recalculatePrediction();
 }
 
 function startTimerSession() {
-  const bookTitle = DOM.bookTitleInput.value.trim() || '미지정 교재';
+  const bookTitle = DOM.bookTitleInput ? DOM.bookTitleInput.value.trim() || '미지정 교재' : '미지정 교재';
   const pred = calculatePrediction();
 
   state.timer.sessionData = {
@@ -520,13 +526,13 @@ function startTimerSession() {
 
   state.timer.seconds = 0;
   state.timer.isPaused = false;
-  DOM.btnPauseTimer.innerHTML = `<i class="fa-solid fa-pause"></i> 일시정지`;
+  if (DOM.btnPauseTimer) DOM.btnPauseTimer.innerHTML = `<i class="fa-solid fa-pause"></i> 일시정지`;
 
-  DOM.activeBookDisplay.textContent = `${bookTitle} (${pred.problemCount}문제)`;
-  DOM.timerTargetTime.textContent = `${pred.totalPredictedMin}분`;
+  if (DOM.activeBookDisplay) DOM.activeBookDisplay.textContent = `${bookTitle} (${pred.problemCount}문제)`;
+  if (DOM.timerTargetTime) DOM.timerTargetTime.textContent = `${pred.totalPredictedMin}분`;
 
-  DOM.estimationPanel.classList.add('hidden');
-  DOM.activeTimerPanel.classList.remove('hidden');
+  DOM.estimationPanel?.classList.add('hidden');
+  DOM.activeTimerPanel?.classList.remove('hidden');
 
   updateTimerDisplay();
   state.timer.intervalId = setInterval(() => {
@@ -539,10 +545,11 @@ function startTimerSession() {
 
 function togglePauseTimer() {
   state.timer.isPaused = !state.timer.isPaused;
-  DOM.btnPauseTimer.innerHTML = state.timer.isPaused ? `<i class="fa-solid fa-play"></i> 재개` : `<i class="fa-solid fa-pause"></i> 일시정지`;
+  if (DOM.btnPauseTimer) DOM.btnPauseTimer.innerHTML = state.timer.isPaused ? `<i class="fa-solid fa-play"></i> 재개` : `<i class="fa-solid fa-pause"></i> 일시정지`;
 }
 
 function updateTimerDisplay() {
+  if (!DOM.timerDisplay) return;
   const hrs = String(Math.floor(state.timer.seconds / 3600)).padStart(2, '0');
   const mins = String(Math.floor((state.timer.seconds % 3600) / 60)).padStart(2, '0');
   const secs = String(state.timer.seconds % 60).padStart(2, '0');
@@ -553,14 +560,14 @@ function stopTimerSession() {
   clearInterval(state.timer.intervalId);
   const actualMinutes = Math.max(1, Math.round(state.timer.seconds / 60));
   
-  DOM.activeTimerPanel.classList.add('hidden');
-  DOM.estimationPanel.classList.remove('hidden');
+  DOM.activeTimerPanel?.classList.add('hidden');
+  DOM.estimationPanel?.classList.remove('hidden');
 
   openFeedbackModal(state.timer.sessionData, actualMinutes);
 }
 
 function openManualFinishModal() {
-  const bookTitle = DOM.bookTitleInput.value.trim() || '미지정 교재';
+  const bookTitle = DOM.bookTitleInput ? DOM.bookTitleInput.value.trim() || '미지정 교재' : '미지정 교재';
   const pred = calculatePrediction();
 
   const sessionData = {
@@ -575,20 +582,19 @@ function openManualFinishModal() {
 
 function openFeedbackModal(sessionData, defaultActualMin) {
   state.timer.sessionData = sessionData;
-  DOM.modalSessionInfo.textContent = `교재: ${sessionData.bookTitle} (${sessionData.problemCount}문제) | 예상: ${sessionData.predictedMin}분`;
-  DOM.actualTimeInput.value = defaultActualMin;
-  DOM.actualWrongInput.value = Math.round(sessionData.problemCount * (parseFloat(DOM.errorRateSlider.value) / 100));
-  DOM.feedbackModal.classList.remove('hidden');
+  if (DOM.modalSessionInfo) DOM.modalSessionInfo.textContent = `교재: ${sessionData.bookTitle} (${sessionData.problemCount}문제) | 예상: ${sessionData.predictedMin}분`;
+  if (DOM.actualTimeInput) DOM.actualTimeInput.value = defaultActualMin;
+  if (DOM.actualWrongInput) DOM.actualWrongInput.value = Math.round(sessionData.problemCount * ((parseFloat(DOM.errorRateSlider?.value) || 20) / 100));
+  DOM.feedbackModal?.classList.remove('hidden');
 }
 
 function closeFeedbackModal() {
-  DOM.feedbackModal.classList.add('hidden');
+  DOM.feedbackModal?.classList.add('hidden');
 }
 
-// Feedback Submit & Send to Supabase Cloud
 async function submitSessionFeedback() {
-  const actualMin = parseInt(DOM.actualTimeInput.value) || 1;
-  const wrongCount = parseInt(DOM.actualWrongInput.value) || 0;
+  const actualMin = parseInt(DOM.actualTimeInput?.value) || 1;
+  const wrongCount = parseInt(DOM.actualWrongInput?.value) || 0;
   const session = state.timer.sessionData;
 
   const predictedMin = session.predictedMin;
@@ -615,7 +621,6 @@ async function submitSessionFeedback() {
   state.history.unshift(newLog);
   localStorage.setItem('study_history', JSON.stringify(state.history));
 
-  // Send Anonymous Session Record to Supabase
   if (state.supabaseClient) {
     try {
       await state.supabaseClient.from('study_logs').insert([{
@@ -640,6 +645,7 @@ async function submitSessionFeedback() {
 }
 
 function renderPresetList() {
+  if (!DOM.presetListGrid) return;
   if (state.presets.length === 0) {
     DOM.presetListGrid.innerHTML = `<p style="color:var(--text-muted)">등록된 교재 프리셋이 없습니다.</p>`;
     return;
@@ -660,9 +666,9 @@ function renderPresetList() {
 }
 
 function saveNewPreset() {
-  const title = document.getElementById('new-preset-title').value.trim();
-  const subject = document.getElementById('new-preset-subject').value.trim() || '일반';
-  const difficulty = parseFloat(document.getElementById('new-preset-difficulty').value);
+  const title = document.getElementById('new-preset-title')?.value.trim();
+  const subject = document.getElementById('new-preset-subject')?.value.trim() || '일반';
+  const difficulty = parseFloat(document.getElementById('new-preset-difficulty')?.value || 1.5);
 
   if (!title) {
     alert('교재명을 입력해주세요.');
@@ -694,27 +700,28 @@ function savePresets() {
 }
 
 function closePresetModal() {
-  DOM.presetModal.classList.add('hidden');
+  DOM.presetModal?.classList.add('hidden');
 }
 
 function renderHistory() {
+  if (!DOM.historyTableBody) return;
   const logs = state.history;
-  DOM.statTotalCount.textContent = `${logs.length}회`;
+  if (DOM.statTotalCount) DOM.statTotalCount.textContent = `${logs.length}회`;
 
   if (logs.length === 0) {
     DOM.historyTableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted)">저장된 공부 기록이 없습니다.</td></tr>`;
-    DOM.statAccuracy.textContent = '100%';
-    DOM.statTotalHours.textContent = '0시간';
+    if (DOM.statAccuracy) DOM.statAccuracy.textContent = '100%';
+    if (DOM.statTotalHours) DOM.statTotalHours.textContent = '0시간';
     renderSubjectBreakdown({});
     return;
   }
 
   const totalMin = logs.reduce((acc, cur) => acc + cur.actualMin, 0);
-  DOM.statTotalHours.textContent = `${(totalMin / 60).toFixed(1)}시간`;
+  if (DOM.statTotalHours) DOM.statTotalHours.textContent = `${(totalMin / 60).toFixed(1)}시간`;
 
   const avgRatio = logs.reduce((acc, cur) => acc + parseFloat(cur.errorRatio), 0) / logs.length;
   const accuracy = Math.max(0, 100 - Math.abs(avgRatio - 100));
-  DOM.statAccuracy.textContent = `${accuracy.toFixed(0)}%`;
+  if (DOM.statAccuracy) DOM.statAccuracy.textContent = `${accuracy.toFixed(0)}%`;
 
   const subjectTotals = {};
   logs.forEach(log => {
@@ -743,6 +750,7 @@ function renderHistory() {
 }
 
 function renderSubjectBreakdown(subjectTotals) {
+  if (!DOM.subjectProgressBar || !DOM.subjectLegend) return;
   const total = Object.values(subjectTotals).reduce((a, b) => a + b, 0);
 
   if (total === 0) {
