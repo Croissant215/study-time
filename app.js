@@ -1,5 +1,8 @@
 /**
- * Study Time Estimator - Pure JavaScript Engine with Robust Null Safety
+ * Study Time Estimator - Pure JavaScript Engine
+ * Features:
+ * 1. User-customizable Study & Rest Pomodoro Intervals
+ * 2. Optional Error Review Time Calculation (Disabled by Default)
  */
 
 // Global State
@@ -56,12 +59,6 @@ const SMART_AI_DATABASE = [
 const DOM = {
   tabs: document.querySelectorAll('.tab-btn'),
   tabContents: document.querySelectorAll('.tab-content'),
-  btnOpenSupabaseConfig: document.getElementById('btn-open-supabase-config'),
-  supabaseModal: document.getElementById('supabase-modal'),
-  supabaseUrlInput: document.getElementById('supabase-url'),
-  supabaseAnonKeyInput: document.getElementById('supabase-anon-key'),
-  btnSaveSupabaseConfig: document.getElementById('btn-save-supabase-config'),
-  supabaseStatusBadge: document.getElementById('supabase-status-badge'),
   btnExportData: document.getElementById('btn-export-data'),
   importFileInput: document.getElementById('import-file-input'),
   onboardingModal: document.getElementById('onboarding-modal'),
@@ -77,10 +74,15 @@ const DOM = {
   problemCountInput: document.getElementById('problem-count'),
   difficultySlider: document.getElementById('difficulty-weight'),
   difficultyBadge: document.getElementById('difficulty-badge'),
+  enableReviewTime: document.getElementById('enable-review-time'),
+  reviewTimeInputsContainer: document.getElementById('review-time-inputs-container'),
   errorRateSlider: document.getElementById('error-rate'),
   errorRateVal: document.getElementById('error-rate-val'),
   wrongReviewTimeInput: document.getElementById('wrong-review-time'),
   enablePomodoro: document.getElementById('enable-pomodoro'),
+  pomodoroInputsContainer: document.getElementById('pomodoro-inputs-container'),
+  pomodoroStudyIntervalInput: document.getElementById('pomodoro-study-interval'),
+  pomodoroRestIntervalInput: document.getElementById('pomodoro-rest-interval'),
   skillMultVal: document.getElementById('skill-mult-val'),
   alphaValDisplay: document.getElementById('alpha-val'),
   predictedTotalTime: document.getElementById('predicted-total-time'),
@@ -88,6 +90,8 @@ const DOM = {
   predictedSolveTime: document.getElementById('predicted-solve-time'),
   predictedReviewTime: document.getElementById('predicted-review-time'),
   predictedRestTime: document.getElementById('predicted-rest-time'),
+  breakdownReviewItem: document.getElementById('breakdown-review-item'),
+  breakdownRestItem: document.getElementById('breakdown-rest-item'),
   btnStartTimer: document.getElementById('btn-start-timer'),
   btnManualFinish: document.getElementById('btn-manual-finish'),
   estimationPanel: document.getElementById('estimation-result-panel'),
@@ -134,41 +138,8 @@ function initSupabaseClient() {
   if (state.supabaseConfig.url && state.supabaseConfig.anonKey && window.supabase) {
     try {
       state.supabaseClient = window.supabase.createClient(state.supabaseConfig.url, state.supabaseConfig.anonKey);
-      if (DOM.supabaseStatusBadge) {
-        DOM.supabaseStatusBadge.innerHTML = `<i class="fa-solid fa-cloud-check" style="color:var(--secondary)"></i> Supabase Cloud: 자동 연결됨`;
-      }
-    } catch (e) {
-      if (DOM.supabaseStatusBadge) {
-        DOM.supabaseStatusBadge.innerHTML = `<i class="fa-solid fa-cloud" style="color:var(--text-muted)"></i> Supabase Cloud: 연결 대기`;
-      }
-    }
-  } else {
-    if (DOM.supabaseStatusBadge) {
-      DOM.supabaseStatusBadge.innerHTML = `<i class="fa-solid fa-cloud" style="color:var(--text-muted)"></i> Supabase Cloud: 연결 대기`;
-    }
+    } catch (e) {}
   }
-}
-
-function openSupabaseModal() {
-  if (DOM.supabaseUrlInput) DOM.supabaseUrlInput.value = state.supabaseConfig.url || '';
-  if (DOM.supabaseAnonKeyInput) DOM.supabaseAnonKeyInput.value = state.supabaseConfig.anonKey || '';
-  DOM.supabaseModal?.classList.remove('hidden');
-}
-
-function closeSupabaseModal() {
-  DOM.supabaseModal?.classList.add('hidden');
-}
-
-function saveSupabaseConfig() {
-  if (!DOM.supabaseUrlInput || !DOM.supabaseAnonKeyInput) return;
-  const url = DOM.supabaseUrlInput.value.trim();
-  const anonKey = DOM.supabaseAnonKeyInput.value.trim();
-
-  state.supabaseConfig = { url, anonKey };
-  localStorage.setItem('study_supabase_config', JSON.stringify(state.supabaseConfig));
-  initSupabaseClient();
-  closeSupabaseModal();
-  alert('🌐 Supabase Cloud 연동 설정이 저장되었습니다!');
 }
 
 function checkOnboarding() {
@@ -213,9 +184,6 @@ function setupEventListeners() {
     });
   });
 
-  if (DOM.btnOpenSupabaseConfig) DOM.btnOpenSupabaseConfig.addEventListener('click', openSupabaseModal);
-  if (DOM.btnSaveSupabaseConfig) DOM.btnSaveSupabaseConfig.addEventListener('click', saveSupabaseConfig);
-
   DOM.btnSaveOnboarding?.addEventListener('click', saveOnboarding);
   DOM.btnReOnboard?.addEventListener('click', () => DOM.onboardingModal?.classList.remove('hidden'));
 
@@ -244,12 +212,39 @@ function setupEventListeners() {
     updateDifficultyBadge(parseFloat(e.target.value));
     recalculatePrediction();
   });
+
+  // Toggle Error Review Time Input Section
+  DOM.enableReviewTime?.addEventListener('change', (e) => {
+    if (e.target.checked) {
+      DOM.reviewTimeInputsContainer?.classList.remove('hidden');
+      DOM.breakdownReviewItem?.classList.remove('hidden');
+    } else {
+      DOM.reviewTimeInputsContainer?.classList.add('hidden');
+      DOM.breakdownReviewItem?.classList.add('hidden');
+    }
+    recalculatePrediction();
+  });
+
   DOM.errorRateSlider?.addEventListener('input', (e) => {
     if (DOM.errorRateVal) DOM.errorRateVal.textContent = `${e.target.value}%`;
     recalculatePrediction();
   });
   DOM.wrongReviewTimeInput?.addEventListener('input', recalculatePrediction);
-  DOM.enablePomodoro?.addEventListener('change', recalculatePrediction);
+
+  // Toggle Custom Pomodoro Interval Input Section
+  DOM.enablePomodoro?.addEventListener('change', (e) => {
+    if (e.target.checked) {
+      DOM.pomodoroInputsContainer?.classList.remove('hidden');
+      DOM.breakdownRestItem?.classList.remove('hidden');
+    } else {
+      DOM.pomodoroInputsContainer?.classList.add('hidden');
+      DOM.breakdownRestItem?.classList.add('hidden');
+    }
+    recalculatePrediction();
+  });
+
+  DOM.pomodoroStudyIntervalInput?.addEventListener('input', recalculatePrediction);
+  DOM.pomodoroRestIntervalInput?.addEventListener('input', recalculatePrediction);
 
   DOM.btnStartTimer?.addEventListener('click', startTimerSession);
   DOM.btnManualFinish?.addEventListener('click', openManualFinishModal);
@@ -282,12 +277,9 @@ async function fetchGlobalDifficultyFromSupabase(bookTitle) {
     }
     setSliderAndBadge(globalWeight);
     recalculatePrediction();
-  } catch (err) {
-    console.log('Supabase fetch passive bypass', err);
-  }
+  } catch (err) {}
 }
 
-// Data Export & Import
 function exportData() {
   const backupObj = {
     version: '2.0',
@@ -295,8 +287,7 @@ function exportData() {
     profile: state.profile,
     presets: state.presets,
     subjectAlphas: state.subjectAlphas,
-    history: state.history,
-    supabaseConfig: state.supabaseConfig
+    history: state.history
   };
 
   const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupObj, null, 2));
@@ -317,13 +308,11 @@ function importData(event) {
       if (importedData.presets) state.presets = importedData.presets;
       if (importedData.subjectAlphas) state.subjectAlphas = importedData.subjectAlphas;
       if (importedData.history) state.history = importedData.history;
-      if (importedData.supabaseConfig) state.supabaseConfig = importedData.supabaseConfig;
 
       localStorage.setItem('study_user_profile', JSON.stringify(state.profile));
       localStorage.setItem('study_presets', JSON.stringify(state.presets));
       localStorage.setItem('study_subject_alphas', JSON.stringify(state.subjectAlphas));
       localStorage.setItem('study_history', JSON.stringify(state.history));
-      localStorage.setItem('study_supabase_config', JSON.stringify(state.supabaseConfig));
 
       initSupabaseClient();
       updateProfileBar();
@@ -340,7 +329,6 @@ function importData(event) {
   }
 }
 
-// Built-in Smart AI Classifier
 function runBuiltInSmartAIClassifier(bookTitle) {
   const lowerTitle = bookTitle.toLowerCase();
 
@@ -402,12 +390,12 @@ function adjustCount(delta) {
   recalculatePrediction();
 }
 
+// User-customizable Prediction Calculation
 function calculatePrediction() {
   const problemCount = parseInt(DOM.problemCountInput?.value) || 1;
   const difficultyWeight = parseFloat(DOM.difficultySlider?.value) || 1.5;
-  const errorRatePercent = parseFloat(DOM.errorRateSlider?.value) || 20;
-  const wrongReviewTimeMin = parseInt(DOM.wrongReviewTimeInput?.value) || 5;
-  const isPomodoro = DOM.enablePomodoro ? DOM.enablePomodoro.checked : true;
+  const isReviewTimeEnabled = DOM.enableReviewTime ? DOM.enableReviewTime.checked : false;
+  const isPomodoroEnabled = DOM.enablePomodoro ? DOM.enablePomodoro.checked : false;
 
   const bookTitle = DOM.bookTitleInput ? DOM.bookTitleInput.value.trim() || '일반' : '일반';
   const subject = getSubjectFromTitle(bookTitle);
@@ -415,15 +403,30 @@ function calculatePrediction() {
   const skillMult = state.profile ? state.profile.skillMult : 1.0;
   const alpha = state.subjectAlphas[subject] || 1.0;
 
+  // 1. Pure Solving Time Calculation
   const solveTimeRaw = problemCount * 2.5 * difficultyWeight * skillMult;
-  const estimatedWrongCount = problemCount * (errorRatePercent / 100);
-  const reviewTimeRaw = estimatedWrongCount * wrongReviewTimeMin;
+  
+  // 2. Optional Error Review Calculation
+  let reviewTimeRaw = 0;
+  let estimatedWrongCount = 0;
+  if (isReviewTimeEnabled) {
+    const errorRatePercent = parseFloat(DOM.errorRateSlider?.value) || 20;
+    const wrongReviewTimeMin = parseInt(DOM.wrongReviewTimeInput?.value) || 5;
+    estimatedWrongCount = problemCount * (errorRatePercent / 100);
+    reviewTimeRaw = estimatedWrongCount * wrongReviewTimeMin;
+  }
 
   const pureStudyMin = Math.round((solveTimeRaw + reviewTimeRaw) * alpha);
   
+  // 3. User-customizable Pomodoro Rest Calculation
   let restMin = 0;
-  if (isPomodoro && pureStudyMin >= 50) {
-    restMin = Math.floor(pureStudyMin / 50) * 10;
+  if (isPomodoroEnabled && pureStudyMin > 0) {
+    const studyInterval = Math.max(10, parseInt(DOM.pomodoroStudyIntervalInput?.value) || 50);
+    const restInterval = Math.max(1, parseInt(DOM.pomodoroRestIntervalInput?.value) || 10);
+
+    if (pureStudyMin >= studyInterval) {
+      restMin = Math.floor(pureStudyMin / studyInterval) * restInterval;
+    }
   }
 
   const totalPredictedMin = pureStudyMin + restMin;
@@ -631,10 +634,7 @@ async function submitSessionFeedback() {
         actual_min: actualMin,
         wrong_count: wrongCount
       }]);
-      console.log('Successfully synced session to Supabase Crowdsourced Cloud!');
-    } catch (e) {
-      console.log('Supabase sync passive bypass', e);
-    }
+    } catch (e) {}
   }
 
   closeFeedbackModal();

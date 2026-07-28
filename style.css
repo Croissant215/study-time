@@ -345,7 +345,17 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
+/* Option Box */
+.option-box {
+  background: var(--bg-card-sub);
+  border: 1px solid var(--border-subtle);
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+}
+
 /* Finish Clock Badge */
+
 .target-clock-badge {
   display: inline-flex;
   align-items: center;
