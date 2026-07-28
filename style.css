@@ -90,7 +90,7 @@ body {
 #bar-skill-level {
   white-space: nowrap !important;
   word-break: keep-all !important;
-  display: inline-flex !alignment;
+  display: inline-flex !important;
   align-items: center;
   line-height: 1.2;
 }
@@ -102,6 +102,7 @@ body {
   font-size: 1.4rem;
   font-weight: 800;
   color: var(--primary);
+  flex-shrink: 0;
 }
 
 
@@ -115,11 +116,12 @@ body {
   flex-direction: row !important;
   flex-wrap: nowrap !important;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 8px;
   background: var(--bg-card-sub);
   padding: 6px;
   border-radius: 30px;
-  overflow-x: auto;
+  width: auto !important;
 }
 
 .tab-btn {
@@ -133,12 +135,26 @@ body {
   color: var(--text-muted);
   cursor: pointer;
   transition: all 0.25s ease;
-  display: flex;
+  display: inline-flex !important;
   align-items: center;
   gap: 8px;
   white-space: nowrap !important;
   flex-shrink: 0 !important;
 }
+
+/* Ensure file input is completely invisible */
+#import-file-input,
+input[type="file"].hidden,
+.hidden {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  position: absolute !important;
+  pointer-events: none !important;
+}
+
 
 .tab-btn:hover {
   color: var(--text-main);
@@ -839,53 +855,27 @@ input[type="range"] {
   margin-top: 28px;
 }
 
-/* Mobile Optimization Media Queries (< 600px) */
-@media (max-width: 600px) {
-  .app-container {
-    padding: 12px 10px;
-  }
-
-  .profile-summary-bar {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 14px 16px;
-    gap: 10px;
-  }
-
-  .profile-info {
-    font-size: 0.86rem;
-    gap: 6px;
-  }
-
-  #bar-skill-level {
-    font-size: 0.76rem;
-    padding: 4px 10px;
-    white-space: nowrap !important;
-    word-break: keep-all !important;
-  }
-
+@media (max-width: 900px) {
   .app-header {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 16px;
+    align-items: center;
+    gap: 14px;
   }
 
   .nav-tabs {
-    width: 100%;
-    display: flex !important;
+    width: 100% !important;
+    justify-content: center !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
-    justify-content: flex-start;
-    overflow-x: auto;
-    padding: 4px;
   }
 
   .tab-btn {
-    padding: 8px 12px;
-    font-size: 0.82rem;
+    padding: 10px 14px;
+    font-size: 0.86rem;
     white-space: nowrap !important;
   }
+}
+
 
 
   .card {
