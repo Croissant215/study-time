@@ -855,26 +855,80 @@ input[type="range"] {
   margin-top: 28px;
 }
 
-@media (max-width: 900px) {
+/* Mobile Optimization Media Queries (< 600px) */
+@media (max-width: 600px) {
+  .app-container {
+    padding: 10px 8px;
+  }
+
   .app-header {
     flex-direction: column;
     align-items: center;
-    gap: 14px;
+    gap: 12px;
+    padding: 12px 10px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .logo {
+    font-size: 1.25rem;
   }
 
   .nav-tabs {
     width: 100% !important;
-    justify-content: center !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    display: flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
+    justify-content: space-between !important;
+    align-items: center;
+    gap: 2px !important;
+    padding: 4px !important;
+    margin: 0 auto !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .tab-btn {
-    padding: 10px 14px;
-    font-size: 0.86rem;
+    padding: 8px 6px !important;
+    font-size: 0.74rem !important;
+    gap: 4px !important;
     white-space: nowrap !important;
+    flex: 1 1 0px !important;
+    justify-content: center !important;
+    text-align: center !important;
   }
-}
+
+  .tab-btn i {
+    font-size: 0.8rem;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .profile-summary-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 12px 14px;
+    gap: 8px;
+  }
+
+  .profile-info {
+    font-size: 0.84rem;
+    gap: 6px;
+  }
+
+  #bar-skill-level {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+  }
+
 
 
 
