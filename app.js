@@ -1,11 +1,11 @@
 /**
- * Study Time Estimator - Pure JavaScript Engine with Built-in Smart AI Textbook Classifier
- * Key Features:
- * - Built-in Smart AI Classifier (Zero API Key Needed, 100% Free & Automatic)
- * - 200+ Extended Book & Exam Keywords (Math, English, Korean, Science, CS/Certificates, Famous Instructors)
- * - Fuzzy Similarity & Substring Matching Engine
- * - Onboarding User Skill Profile (Hard Core: 1.35x, Standard: 1.0x, Advanced: 0.75x)
- * - Exponential Moving Average Alpha Correction (α)
+ * Study Time Estimator - Pure JavaScript Engine with 5 Premium Features
+ * Features:
+ * 1. JSON Data Backup (Export) & Restoration (Import)
+ * 2. Real-time Target Finish Clock ("Finish at 4:25 PM")
+ * 3. Pomodoro Break Time Auto-addition Option (50m Study / 10m Rest)
+ * 4. Subject-specific Alpha Correction Factor (α_subject)
+ * 5. Subject Study Breakdown Visualizer (Progress Bar & Legend)
  */
 
 // Global State
@@ -14,9 +14,17 @@ const state = {
   presets: JSON.parse(localStorage.getItem('study_presets')) || [
     { id: 'preset-1', title: '개념원리 수학 I', subject: '수학', difficulty_weight: 1.0, correction_factor: 1.0 },
     { id: 'preset-2', title: '쎈 수학 I', subject: '수학', difficulty_weight: 1.5, correction_factor: 1.0 },
-    { id: 'preset-3', title: '블랙라벨 수학 I', subject: '수학', difficulty_weight: 2.5, correction_factor: 1.0 },
-    { id: 'preset-4', title: 'EBS 수능특강 영어', subject: '영어', difficulty_weight: 1.5, correction_factor: 1.0 }
+    { id: 'preset-3', title: '마플시너지 수학 I', subject: '수학', difficulty_weight: 1.9, correction_factor: 1.0 },
+    { id: 'preset-4', title: '블랙라벨 수학 I', subject: '수학', difficulty_weight: 2.7, correction_factor: 1.0 },
+    { id: 'preset-5', title: 'EBS 수능특강 영어', subject: '영어', difficulty_weight: 1.5, correction_factor: 1.0 }
   ],
+  subjectAlphas: JSON.parse(localStorage.getItem('study_subject_alphas')) || {
+    '수학': 1.0,
+    '영어': 1.0,
+    '국어': 1.0,
+    '탐구': 1.0,
+    '일반': 1.0
+  },
   history: JSON.parse(localStorage.getItem('study_history')) || [],
   timer: {
     intervalId: null,
@@ -24,58 +32,33 @@ const state = {
     isPaused: false,
     sessionData: null
   },
-  currentCorrectionFactor: 1.0,
   debounceTimer: null
 };
 
-// Extended Built-in Smart AI Knowledge Database (Detailed 5-Tier System)
+// Subject Colors Palette for Visualizer
+const SUBJECT_COLORS = {
+  '수학': '#D96B43',
+  '영어': '#D97706',
+  '국어': '#577557',
+  '탐구': '#2563EB',
+  '일반': '#8B5CF6'
+};
+
+// Built-in Smart AI Database (5-Tier System)
 const SMART_AI_DATABASE = [
-  // Tier 1: 최고난도 / 킬러 (2.6x ~ 3.0x)
-  { 
-    keywords: ['블랙라벨', '킬러', '30번', '22번', '경시', '하이라벨', '시대인재', '킬패스', '의대', '모의고사 30번'], 
-    weight: 2.7, 
-    tier: '최고난도/킬러', 
-    reason: '최상위권 변별을 위한 극상 난도 킬러 문항 중심 교재로 분석되었습니다.' 
-  },
-  
-  // Tier 2: 심화 / 준킬러 (2.1x ~ 2.4x)
-  { 
-    keywords: ['고쟁이', '1등급', '일등급', '최상위', '일품', '짱어려운', '어삼쉬삼', '마플4점', '드릴', 'N제'], 
-    weight: 2.2, 
-    tier: '심화/준킬러', 
-    reason: '상위권 도약을 위한 고난도 준킬러 및 응용 심화 문제집으로 분석되었습니다.' 
-  },
-
-  // Tier 3: 유형 준심화 / 마플 (1.8x ~ 2.0x) - 사용자 피드백 반영
-  { 
-    keywords: ['마플시너지', '마플', '자이스토리', '마더텅', '쎈C', '마플교과서'], 
-    weight: 1.9, 
-    tier: '유형/준심화', 
-    reason: '쎈보다 문항 수가 압도적으로 많고 준심화 기출 변형이 많은 상위 유형서로 분석되었습니다.' 
-  },
-
-  // Tier 4: 유형 / 표준 (1.4x ~ 1.6x)
-  { 
-    keywords: ['쎈', '유형', '수특', '수능특강', '수능완성', '실전', '짱중요한', '개념쎈', '매3비', '매3문', '워드마스터', '현우진', '한석원', '정승제', '오지훈', '백호'], 
-    weight: 1.5, 
-    tier: '유형/실전', 
-    reason: '표준 수능/내신 필수 유형 정리용 문제집으로 분석되었습니다.' 
-  },
-
-  // Tier 5: 개념 / 기초 / 입문 (0.9x ~ 1.2x)
-  { 
-    keywords: ['개념원리', '개념', '기초', '수력충전', '입문', '기본', '라이트쎈', '라이트', '짱쉬운', '수학의샘', '워밍업', '노베이스'], 
-    weight: 1.0, 
-    tier: '개념/기초', 
-    reason: '기초 개념 이해 및 기본 문제 풀이용 교재로 분석되었습니다.' 
-  }
+  { keywords: ['블랙라벨', '킬러', '30번', '22번', '경시', '하이라벨', '시대인재', '킬패스', '의대', '모의고사 30번'], weight: 2.7, tier: '최고난도/킬러', reason: '최상위권 변별을 위한 극상 난도 킬러 문항 중심 교재로 분석되었습니다.' },
+  { keywords: ['고쟁이', '1등급', '일등급', '최상위', '일품', '짱어려운', '어삼쉬삼', '마플4점', '드릴', 'N제'], weight: 2.2, tier: '심화/준킬러', reason: '상위권 도약을 위한 고난도 준킬러 및 응용 심화 문제집으로 분석되었습니다.' },
+  { keywords: ['마플시너지', '마플', '자이스토리', '마더텅', '쎈C', '마플교과서'], weight: 1.9, tier: '유형/준심화', reason: '쎈보다 문항 수가 압도적으로 많고 준심화 기출 변형이 많은 상위 유형서로 분석되었습니다.' },
+  { keywords: ['쎈', '유형', '수특', '수능특강', '수능완성', '실전', '짱중요한', '개념쎈', '매3비', '매3문', '워드마스터', '현우진', '한석원', '정승제', '오지훈', '백호'], weight: 1.5, tier: '유형/실전', reason: '표준 수능/내신 필수 유형 정리용 문제집으로 분석되었습니다.' },
+  { keywords: ['개념원리', '개념', '기초', '수력충전', '입문', '기본', '라이트쎈', '라이트', '짱쉬운', '수학의샘', '워밍업', '노베이스'], weight: 1.0, tier: '개념/기초', reason: '기초 개념 이해 및 기본 문제 풀이용 교재로 분석되었습니다.' }
 ];
-
 
 // DOM Elements
 const DOM = {
   tabs: document.querySelectorAll('.tab-btn'),
   tabContents: document.querySelectorAll('.tab-content'),
+  btnExportData: document.getElementById('btn-export-data'),
+  importFileInput: document.getElementById('import-file-input'),
   onboardingModal: document.getElementById('onboarding-modal'),
   onboardUserName: document.getElementById('onboard-user-name'),
   btnSaveOnboarding: document.getElementById('btn-save-onboarding'),
@@ -83,8 +66,6 @@ const DOM = {
   barUserName: document.getElementById('bar-user-name'),
   barSkillLevel: document.getElementById('bar-skill-level'),
   bookTitleInput: document.getElementById('book-title'),
-
-
   btnSelectPreset: document.getElementById('btn-select-preset'),
   presetDropdown: document.getElementById('preset-dropdown'),
   autoAnalysisTag: document.getElementById('auto-analysis-tag'),
@@ -94,11 +75,14 @@ const DOM = {
   errorRateSlider: document.getElementById('error-rate'),
   errorRateVal: document.getElementById('error-rate-val'),
   wrongReviewTimeInput: document.getElementById('wrong-review-time'),
+  enablePomodoro: document.getElementById('enable-pomodoro'),
   skillMultVal: document.getElementById('skill-mult-val'),
   alphaValDisplay: document.getElementById('alpha-val'),
   predictedTotalTime: document.getElementById('predicted-total-time'),
+  targetFinishClock: document.getElementById('target-finish-clock'),
   predictedSolveTime: document.getElementById('predicted-solve-time'),
   predictedReviewTime: document.getElementById('predicted-review-time'),
+  predictedRestTime: document.getElementById('predicted-rest-time'),
   btnStartTimer: document.getElementById('btn-start-timer'),
   btnManualFinish: document.getElementById('btn-manual-finish'),
   estimationPanel: document.getElementById('estimation-result-panel'),
@@ -120,7 +104,9 @@ const DOM = {
   historyTableBody: document.getElementById('history-table-body'),
   statTotalCount: document.getElementById('stat-total-count'),
   statAccuracy: document.getElementById('stat-accuracy'),
-  statTotalHours: document.getElementById('stat-total-hours')
+  statTotalHours: document.getElementById('stat-total-hours'),
+  subjectProgressBar: document.getElementById('subject-progress-bar'),
+  subjectLegend: document.getElementById('subject-legend')
 };
 
 // Initialize Application
@@ -177,8 +163,11 @@ function setupEventListeners() {
   DOM.btnSaveOnboarding.addEventListener('click', saveOnboarding);
   DOM.btnReOnboard.addEventListener('click', () => DOM.onboardingModal.classList.remove('hidden'));
 
-  // Debounced Built-in Smart AI Classifier
+  // Export / Import Event Listeners
+  DOM.btnExportData.addEventListener('click', exportData);
+  DOM.importFileInput.addEventListener('change', importData);
 
+  // Debounced Auto Classifier
   DOM.bookTitleInput.addEventListener('input', (e) => {
     const title = e.target.value.trim();
     clearTimeout(state.debounceTimer);
@@ -205,6 +194,7 @@ function setupEventListeners() {
     recalculatePrediction();
   });
   DOM.wrongReviewTimeInput.addEventListener('input', recalculatePrediction);
+  DOM.enablePomodoro.addEventListener('change', recalculatePrediction);
 
   DOM.btnStartTimer.addEventListener('click', startTimerSession);
   DOM.btnManualFinish.addEventListener('click', openManualFinishModal);
@@ -216,21 +206,68 @@ function setupEventListeners() {
   DOM.btnSavePreset.addEventListener('click', saveNewPreset);
 }
 
-// Built-in Smart AI Classifier (Zero API Key Needed)
+// 1. Data Backup (Export)
+function exportData() {
+  const backupObj = {
+    version: '2.0',
+    timestamp: new Date().toISOString(),
+    profile: state.profile,
+    presets: state.presets,
+    subjectAlphas: state.subjectAlphas,
+    history: state.history
+  };
+
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupObj, null, 2));
+  const downloadAnchor = document.createElement('a');
+  downloadAnchor.setAttribute("href", dataStr);
+  downloadAnchor.setAttribute("download", `study_predict_backup_${new Date().toISOString().split('T')[0]}.json`);
+  document.body.appendChild(downloadAnchor);
+  downloadAnchor.click();
+  downloadAnchor.remove();
+}
+
+// 1. Data Restoration (Import)
+function importData(event) {
+  const fileReader = new FileReader();
+  fileReader.onload = (e) => {
+    try {
+      const importedData = JSON.parse(e.target.result);
+      if (importedData.profile) state.profile = importedData.profile;
+      if (importedData.presets) state.presets = importedData.presets;
+      if (importedData.subjectAlphas) state.subjectAlphas = importedData.subjectAlphas;
+      if (importedData.history) state.history = importedData.history;
+
+      localStorage.setItem('study_user_profile', JSON.stringify(state.profile));
+      localStorage.setItem('study_presets', JSON.stringify(state.presets));
+      localStorage.setItem('study_subject_alphas', JSON.stringify(state.subjectAlphas));
+      localStorage.setItem('study_history', JSON.stringify(state.history));
+
+      updateProfileBar();
+      renderPresetList();
+      renderHistory();
+      recalculatePrediction();
+      alert('🎉 데이터가 성공적으로 복원되었습니다!');
+    } catch (err) {
+      alert('❌ 올바르지 않은 백업 파일 형식이거나 파일이 훼손되었습니다.');
+    }
+  };
+  if (event.target.files && event.target.files[0]) {
+    fileReader.readAsText(event.target.files[0]);
+  }
+}
+
+// Built-in Smart AI Classifier
 function runBuiltInSmartAIClassifier(bookTitle) {
   const lowerTitle = bookTitle.toLowerCase();
 
-  // 1. Check saved presets first
   const existingPreset = state.presets.find(p => p.title.toLowerCase() === lowerTitle);
   if (existingPreset) {
-    state.currentCorrectionFactor = existingPreset.correction_factor || 1.0;
     DOM.autoAnalysisTag.innerHTML = `<i class="fa-solid fa-circle-check" style="color:var(--secondary)"></i> 저장된 교재 프리셋 [${existingPreset.title}] 적용`;
     setSliderAndBadge(existingPreset.difficulty_weight);
     recalculatePrediction();
     return;
   }
 
-  // 2. Built-in Smart Database Parsing
   for (const category of SMART_AI_DATABASE) {
     for (const kw of category.keywords) {
       if (lowerTitle.includes(kw.toLowerCase())) {
@@ -242,7 +279,6 @@ function runBuiltInSmartAIClassifier(bookTitle) {
     }
   }
 
-  // 3. Fallback Smart Inference
   DOM.autoAnalysisTag.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> <strong>웹 내장 AI 추론:</strong> 일반 학습 교재 패턴으로 분석되었습니다. (1.3x)`;
   setSliderAndBadge(1.3);
   recalculatePrediction();
@@ -265,6 +301,14 @@ function getTierLabel(weight) {
   return '최고난도/킬러';
 }
 
+function getSubjectFromTitle(title) {
+  const t = title.toLowerCase();
+  if (t.includes('수학') || t.includes('쎈') || t.includes('마플') || t.includes('블랙라벨') || t.includes('개념원리')) return '수학';
+  if (t.includes('영어') || t.includes('수특') || t.includes('어휘') || t.includes('보카')) return '영어';
+  if (t.includes('국어') || t.includes('매3비') || t.includes('매3문') || t.includes('문학')) return '국어';
+  if (t.includes('탐구') || t.includes('사탐') || t.includes('과탐') || t.includes('지구') || t.includes('생명')) return '탐구';
+  return '일반';
+}
 
 function adjustCount(delta) {
   const current = parseInt(DOM.problemCountInput.value) || 0;
@@ -279,30 +323,46 @@ function calculatePrediction() {
   const difficultyWeight = parseFloat(DOM.difficultySlider.value) || 1.5;
   const errorRatePercent = parseFloat(DOM.errorRateSlider.value) || 20;
   const wrongReviewTimeMin = parseInt(DOM.wrongReviewTimeInput.value) || 5;
+  const isPomodoro = DOM.enablePomodoro.checked;
+
+  const bookTitle = DOM.bookTitleInput.value.trim() || '일반';
+  const subject = getSubjectFromTitle(bookTitle);
   
   const skillMult = state.profile ? state.profile.skillMult : 1.0;
-  const alpha = state.currentCorrectionFactor || 1.0;
+  const alpha = state.subjectAlphas[subject] || 1.0;
 
   const solveTimeRaw = problemCount * 2.5 * difficultyWeight * skillMult;
   const estimatedWrongCount = problemCount * (errorRatePercent / 100);
   const reviewTimeRaw = estimatedWrongCount * wrongReviewTimeMin;
 
-  const totalPredictedMin = Math.round((solveTimeRaw + reviewTimeRaw) * alpha);
+  const pureStudyMin = Math.round((solveTimeRaw + reviewTimeRaw) * alpha);
+  
+  // Pomodoro Rest Calculation (10 mins rest every 50 mins)
+  let restMin = 0;
+  if (isPomodoro && pureStudyMin >= 50) {
+    restMin = Math.floor(pureStudyMin / 50) * 10;
+  }
+
+  const totalPredictedMin = pureStudyMin + restMin;
   const solveMin = Math.round(solveTimeRaw * alpha);
   const reviewMin = Math.round(reviewTimeRaw * alpha);
 
   return {
     problemCount,
+    subject,
     difficultyWeight,
     totalPredictedMin: Math.max(1, totalPredictedMin),
     solveMin,
     reviewMin,
+    restMin,
+    alpha,
     estimatedWrongCount: Math.round(estimatedWrongCount)
   };
 }
 
 function recalculatePrediction() {
   const pred = calculatePrediction();
+
   const hours = Math.floor(pred.totalPredictedMin / 60);
   const mins = pred.totalPredictedMin % 60;
   const timeFormatted = hours > 0 ? `${hours}시간 ${mins}분` : `${mins}분`;
@@ -310,10 +370,30 @@ function recalculatePrediction() {
   DOM.predictedTotalTime.textContent = timeFormatted;
   DOM.predictedSolveTime.textContent = `${pred.solveMin}분`;
   DOM.predictedReviewTime.textContent = `${pred.reviewMin}분`;
-  DOM.alphaValDisplay.textContent = state.currentCorrectionFactor.toFixed(2);
+  DOM.predictedRestTime.textContent = `${pred.restMin}분`;
+  DOM.alphaValDisplay.textContent = pred.alpha.toFixed(2);
+  
   if (state.profile) {
     DOM.skillMultVal.textContent = `${state.profile.skillMult}x`;
   }
+
+  // 2. Real-time Target Finish Clock Calculation
+  calculateTargetClock(pred.totalPredictedMin);
+}
+
+// 2. Target Finish Clock Calculation
+function calculateTargetClock(totalPredictedMin) {
+  const now = new Date();
+  const finishTime = new Date(now.getTime() + totalPredictedMin * 60 * 1000);
+
+  let hrs = finishTime.getHours();
+  const mins = String(finishTime.getMinutes()).padStart(2, '0');
+  const period = hrs >= 12 ? '오후' : '오전';
+
+  hrs = hrs % 12;
+  if (hrs === 0) hrs = 12;
+
+  DOM.targetFinishClock.innerHTML = `<i class="fa-solid fa-clock"></i> <strong>${period} ${hrs}:${mins}</strong> 에 공부가 완료될 예정입니다!`;
 }
 
 // Presets Dropdown
@@ -345,7 +425,6 @@ function selectPreset(presetId) {
 
   DOM.bookTitleInput.value = preset.title;
   setSliderAndBadge(preset.difficulty_weight);
-  state.currentCorrectionFactor = preset.correction_factor || 1.0;
   DOM.autoAnalysisTag.innerHTML = `<i class="fa-solid fa-circle-check" style="color:var(--secondary)"></i> 프리셋 [${preset.title}] 선택됨`;
   DOM.presetDropdown.classList.add('hidden');
   recalculatePrediction();
@@ -358,6 +437,7 @@ function startTimerSession() {
 
   state.timer.sessionData = {
     bookTitle,
+    subject: pred.subject,
     problemCount: pred.problemCount,
     predictedMin: pred.totalPredictedMin
   };
@@ -409,6 +489,7 @@ function openManualFinishModal() {
 
   const sessionData = {
     bookTitle,
+    subject: pred.subject,
     problemCount: pred.problemCount,
     predictedMin: pred.totalPredictedMin
   };
@@ -428,6 +509,7 @@ function closeFeedbackModal() {
   DOM.feedbackModal.classList.add('hidden');
 }
 
+// 4. Subject-specific Alpha Correction Update & Feedback Submit
 function submitSessionFeedback() {
   const actualMin = parseInt(DOM.actualTimeInput.value) || 1;
   const wrongCount = parseInt(DOM.actualWrongInput.value) || 0;
@@ -435,21 +517,19 @@ function submitSessionFeedback() {
 
   const predictedMin = session.predictedMin;
   const errorRatio = actualMin / predictedMin;
+  const subject = session.subject || '일반';
 
-  const oldAlpha = state.currentCorrectionFactor || 1.0;
+  // Subject-specific Alpha Correction Update
+  const oldAlpha = state.subjectAlphas[subject] || 1.0;
   const newAlpha = Math.max(0.5, Math.min(3.0, (oldAlpha * 0.7) + (errorRatio * 0.3)));
-  state.currentCorrectionFactor = newAlpha;
-
-  const matchedPreset = state.presets.find(p => p.title.toLowerCase() === session.bookTitle.toLowerCase());
-  if (matchedPreset) {
-    matchedPreset.correction_factor = newAlpha;
-    savePresets();
-  }
+  state.subjectAlphas[subject] = newAlpha;
+  localStorage.setItem('study_subject_alphas', JSON.stringify(state.subjectAlphas));
 
   const newLog = {
     id: `log-${Date.now()}`,
     date: new Date().toISOString().split('T')[0],
     bookTitle: session.bookTitle,
+    subject,
     problemCount: session.problemCount,
     predictedMin,
     actualMin,
@@ -464,7 +544,7 @@ function submitSessionFeedback() {
   renderHistory();
   recalculatePrediction();
 
-  alert(`학습 기록이 저장되었습니다!\n오차율 반영 보정 가중치(α): ${oldAlpha.toFixed(2)} -> ${newAlpha.toFixed(2)}`);
+  alert(`학습 기록이 저장되었습니다!\n[${subject}] 과목의 보정 가중치(α): ${oldAlpha.toFixed(2)} -> ${newAlpha.toFixed(2)}`);
 }
 
 // Presets CRUD
@@ -479,7 +559,7 @@ function renderPresetList() {
       <div class="preset-info">
         <h4>${p.title}</h4>
         <p>${p.subject} | 난이도: ${getTierLabel(p.difficulty_weight)} (${p.difficulty_weight}x)</p>
-        <p><small style="color:var(--primary)">보정 가중치 (α): ${(p.correction_factor || 1.0).toFixed(2)}</small></p>
+        <p><small style="color:var(--primary)">과목 보정 가중치 (α): ${(state.subjectAlphas[p.subject] || 1.0).toFixed(2)}</small></p>
       </div>
       <button class="btn btn-secondary btn-sm" onclick="deletePreset('${p.id}')">
         <i class="fa-solid fa-trash"></i>
@@ -526,15 +606,16 @@ function closePresetModal() {
   DOM.presetModal.classList.add('hidden');
 }
 
-// History & Analytics Render
+// 5. Subject Breakdown Visualizer & History Render
 function renderHistory() {
   const logs = state.history;
   DOM.statTotalCount.textContent = `${logs.length}회`;
 
   if (logs.length === 0) {
-    DOM.historyTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted)">저장된 공부 기록이 없습니다.</td></tr>`;
+    DOM.historyTableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted)">저장된 공부 기록이 없습니다.</td></tr>`;
     DOM.statAccuracy.textContent = '100%';
     DOM.statTotalHours.textContent = '0시간';
+    renderSubjectBreakdown({});
     return;
   }
 
@@ -545,10 +626,19 @@ function renderHistory() {
   const accuracy = Math.max(0, 100 - Math.abs(avgRatio - 100));
   DOM.statAccuracy.textContent = `${accuracy.toFixed(0)}%`;
 
+  // Render Subject Breakdown Bar
+  const subjectTotals = {};
+  logs.forEach(log => {
+    const subj = log.subject || '일반';
+    subjectTotals[subj] = (subjectTotals[subj] || 0) + log.actualMin;
+  });
+  renderSubjectBreakdown(subjectTotals);
+
   DOM.historyTableBody.innerHTML = logs.map(log => `
     <tr>
       <td>${log.date}</td>
       <td><strong>${log.bookTitle}</strong></td>
+      <td><span class="badge badge-medium">${log.subject || '일반'}</span></td>
       <td>${log.problemCount}개</td>
       <td>${log.predictedMin}분</td>
       <td><strong style="color:var(--primary)">${log.actualMin}분</strong></td>
@@ -561,6 +651,35 @@ function renderHistory() {
       </td>
     </tr>
   `).join('');
+}
+
+// 5. Render Subject Progress Segments & Legends
+function renderSubjectBreakdown(subjectTotals) {
+  const total = Object.values(subjectTotals).reduce((a, b) => a + b, 0);
+
+  if (total === 0) {
+    DOM.subjectProgressBar.innerHTML = `<div class="progress-segment" style="width:100%; background:var(--border-subtle);"></div>`;
+    DOM.subjectLegend.innerHTML = `<span style="color:var(--text-muted)">기록이 쌓이면 과목별 비중이 표시됩니다.</span>`;
+    return;
+  }
+
+  let segmentsHtml = '';
+  let legendsHtml = '';
+
+  Object.entries(subjectTotals).forEach(([subj, mins]) => {
+    const pct = ((mins / total) * 100).toFixed(1);
+    const color = SUBJECT_COLORS[subj] || '#6B7280';
+    segmentsHtml += `<div class="progress-segment" style="width:${pct}%; background:${color};" title="${subj}: ${pct}%"></div>`;
+    legendsHtml += `
+      <div class="legend-item">
+        <span class="legend-color-dot" style="background:${color};"></span>
+        <span>${subj}: <strong>${pct}%</strong> (${(mins / 60).toFixed(1)}h)</span>
+      </div>
+    `;
+  });
+
+  DOM.subjectProgressBar.innerHTML = segmentsHtml;
+  DOM.subjectLegend.innerHTML = legendsHtml;
 }
 
 function deleteHistoryLog(id) {

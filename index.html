@@ -28,13 +28,19 @@
           <i class="fa-solid fa-book-bookmark"></i> 교재 프리셋
         </button>
         <button class="tab-btn" data-tab="analytics">
-          <i class="fa-solid fa-chart-line"></i> 오차 분석 & 기록
+          <i class="fa-solid fa-chart-line"></i> 오차 분석 & 리포트
         </button>
       </nav>
-      <span class="badge badge-accent"><i class="fa-solid fa-bolt"></i> 웹 내장 AI 100% 자동</span>
+      <div class="header-actions">
+        <button type="button" id="btn-export-data" class="btn btn-secondary btn-sm" title="데이터 JSON 백업">
+          <i class="fa-solid fa-download"></i> 백업
+        </button>
+        <label for="import-file-input" class="btn btn-secondary btn-sm" title="데이터 JSON 복원" style="cursor:pointer; margin-bottom:0;">
+          <i class="fa-solid fa-upload"></i> 복원
+        </label>
+        <input type="file" id="import-file-input" accept=".json" class="hidden">
+      </div>
     </header>
-
-
 
     <!-- 사용자 프로필 바 -->
     <div id="user-profile-bar" class="profile-summary-bar">
@@ -64,7 +70,7 @@
               <div class="form-group">
                 <label for="book-title">교재명 또는 과목명</label>
                 <div class="input-with-action">
-                  <input type="text" id="book-title" placeholder="예: 쎈 수학 I, EBS 수능특강 영어, 블랙라벨, 현우진 드릴..." autocomplete="off">
+                  <input type="text" id="book-title" placeholder="예: 쎈 수학 I, EBS 수능특강 영어, 마플시너지, 블랙라벨..." autocomplete="off">
                   <button type="button" id="btn-select-preset" class="btn btn-secondary btn-icon" title="프리셋에서 불러오기">
                     <i class="fa-solid fa-bookmark"></i>
                   </button>
@@ -99,7 +105,6 @@
                   <span style="left: 77.27%;">심화 (2.5x)</span>
                   <span style="left: 100%; transform: translateX(-100%);">킬러 (3.0x)</span>
                 </div>
-
               </div>
 
               <!-- 오답률 & 복습 시간 -->
@@ -117,12 +122,20 @@
                 </div>
               </div>
 
+              <!-- 뽀모도로 휴식 시간 설정 옵션 -->
+              <div class="form-group pomodoro-box">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:700;">
+                  <input type="checkbox" id="enable-pomodoro" checked>
+                  <i class="fa-solid fa-mug-hot" style="color:var(--primary)"></i> 뽀모도로 휴식 시간 자동 합산 (50분 공부 / 10분 휴식)
+                </label>
+              </div>
+
               <!-- 사용자 보정 알파 값 안내 -->
               <div class="correction-info-box">
                 <i class="fa-solid fa-sliders"></i>
                 <div>
-                  <strong>실력 가중치: <span id="skill-mult-val">1.0x</span> | 오차 보정 알파 ($\alpha$): <span id="alpha-val">1.00</span></strong>
-                  <p>사용자 온보딩 실력과 과거 측정 기록을 바탕으로 자동 보정됩니다.</p>
+                  <strong>실력: <span id="skill-mult-val">1.0x</span> | 과목 보정 알파 ($\alpha$): <span id="alpha-val">1.00</span></strong>
+                  <p>과목별 오답 기록과 온보딩 실력을 바탕으로 세분화 계산됩니다.</p>
                 </div>
               </div>
             </form>
@@ -139,6 +152,10 @@
                 <div class="total-time-box">
                   <span class="sub-label">총 예상 소요 시간</span>
                   <div class="big-time" id="predicted-total-time">00시간 00분</div>
+                  <!-- 현재 시각 기반 완료 목표 시각 디스플레이 -->
+                  <div class="target-clock-badge" id="target-finish-clock">
+                    <i class="fa-solid fa-clock"></i> 오후 --:-- 에 공부가 완료될 예정입니다.
+                  </div>
                 </div>
                 
                 <div class="time-breakdown-grid">
@@ -154,6 +171,13 @@
                     <div>
                       <span>오답 복습 & 정리</span>
                       <strong id="predicted-review-time">0분</strong>
+                    </div>
+                  </div>
+                  <div class="breakdown-item">
+                    <i class="fa-solid fa-mug-hot"></i>
+                    <div>
+                      <span>뽀모도로 휴식</span>
+                      <strong id="predicted-rest-time">0분</strong>
                     </div>
                   </div>
                 </div>
@@ -207,11 +231,11 @@
         </div>
       </section>
 
-      <!-- TAB 3: 오차 분석 & 학습 기록 -->
+      <!-- TAB 3: 오차 분석 & 학습 기록 리포트 -->
       <section id="tab-analytics" class="tab-content">
         <div class="card glass-card">
           <div class="card-header">
-            <h2><i class="fa-solid fa-chart-line"></i> 예측 오차 리포트 & 과거 기록</h2>
+            <h2><i class="fa-solid fa-chart-line"></i> 예측 오차 리포트 & 과목별 통계</h2>
           </div>
 
           <div class="analytics-summary-grid">
@@ -229,12 +253,20 @@
             </div>
           </div>
 
+          <!-- 과목별 공부 비중 visualizer -->
+          <div class="subject-breakdown-card">
+            <h4><i class="fa-solid fa-pie-chart" style="color:var(--primary)"></i> 과목별 누적 공부 비중</h4>
+            <div id="subject-progress-bar" class="progress-bar-container"></div>
+            <div id="subject-legend" class="subject-legend-grid"></div>
+          </div>
+
           <div class="table-responsive">
             <table class="history-table">
               <thead>
                 <tr>
                   <th>날짜</th>
                   <th>교재명</th>
+                  <th>과목</th>
                   <th>문제 수</th>
                   <th>예측 시간</th>
                   <th>실제 시간</th>
@@ -308,11 +340,11 @@
 
         <div class="modal-impact-preview">
           <i class="fa-solid fa-wand-magic-sparkles"></i>
-          <span>이 기록은 다음 세션의 시간 예측을 **더 정확하게 보정**하는 데 반영됩니다.</span>
+          <span>이 기록은 다음 세션의 과목별 시간 예측을 **더 정확하게 보정**하는 데 반영됩니다.</span>
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" id="btn-secondary-close" class="btn btn-secondary" onclick="closeFeedbackModal()">취소</button>
+        <button type="button" class="btn btn-secondary" onclick="closeFeedbackModal()">취소</button>
         <button type="button" id="btn-submit-feedback" class="btn btn-primary">저장 및 오차 보정 반영</button>
       </div>
     </div>
