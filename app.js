@@ -1,11 +1,5 @@
 /**
- * Study Time Estimator - Pure JavaScript Engine with 5 Premium Features
- * Features:
- * 1. JSON Data Backup (Export) & Restoration (Import)
- * 2. Real-time Target Finish Clock ("Finish at 4:25 PM")
- * 3. Pomodoro Break Time Auto-addition Option (50m Study / 10m Rest)
- * 4. Subject-specific Alpha Correction Factor (α_subject)
- * 5. Subject Study Breakdown Visualizer (Progress Bar & Legend)
+ * Study Time Estimator - Pure JavaScript Engine with Supabase Crowdsourced Cloud Integration
  */
 
 // Global State
@@ -26,6 +20,11 @@ const state = {
     '일반': 1.0
   },
   history: JSON.parse(localStorage.getItem('study_history')) || [],
+  supabaseConfig: JSON.parse(localStorage.getItem('study_supabase_config')) || {
+    url: '',
+    anonKey: ''
+  },
+  supabaseClient: null,
   timer: {
     intervalId: null,
     seconds: 0,
@@ -35,7 +34,7 @@ const state = {
   debounceTimer: null
 };
 
-// Subject Colors Palette for Visualizer
+// Subject Colors Palette
 const SUBJECT_COLORS = {
   '수학': '#D96B43',
   '영어': '#D97706',
@@ -57,6 +56,12 @@ const SMART_AI_DATABASE = [
 const DOM = {
   tabs: document.querySelectorAll('.tab-btn'),
   tabContents: document.querySelectorAll('.tab-content'),
+  btnOpenSupabaseConfig: document.getElementById('btn-open-supabase-config'),
+  supabaseModal: document.getElementById('supabase-modal'),
+  supabaseUrlInput: document.getElementById('supabase-url'),
+  supabaseAnonKeyInput: document.getElementById('supabase-anon-key'),
+  btnSaveSupabaseConfig: document.getElementById('btn-save-supabase-config'),
+  supabaseStatusBadge: document.getElementById('supabase-status-badge'),
   btnExportData: document.getElementById('btn-export-data'),
   importFileInput: document.getElementById('import-file-input'),
   onboardingModal: document.getElementById('onboarding-modal'),
@@ -112,11 +117,46 @@ const DOM = {
 // Initialize Application
 document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
+  initSupabaseClient();
   checkOnboarding();
   renderPresetList();
   renderHistory();
   recalculatePrediction();
 });
+
+function initSupabaseClient() {
+  if (state.supabaseConfig.url && state.supabaseConfig.anonKey && window.supabase) {
+    try {
+      state.supabaseClient = window.supabase.createClient(state.supabaseConfig.url, state.supabaseConfig.anonKey);
+      DOM.supabaseStatusBadge.innerHTML = `<i class="fa-solid fa-cloud-check" style="color:var(--secondary)"></i> Supabase Cloud: 연결됨`;
+    } catch (e) {
+      DOM.supabaseStatusBadge.innerHTML = `<i class="fa-solid fa-cloud" style="color:var(--text-muted)"></i> Supabase Cloud: 대기중`;
+    }
+  } else {
+    DOM.supabaseStatusBadge.innerHTML = `<i class="fa-solid fa-cloud" style="color:var(--text-muted)"></i> Supabase Cloud: 대기중 (클릭하여 연동)`;
+  }
+}
+
+function openSupabaseModal() {
+  DOM.supabaseUrlInput.value = state.supabaseConfig.url || '';
+  DOM.supabaseAnonKeyInput.value = state.supabaseConfig.anonKey || '';
+  DOM.supabaseModal.classList.remove('hidden');
+}
+
+function closeSupabaseModal() {
+  DOM.supabaseModal.classList.add('hidden');
+}
+
+function saveSupabaseConfig() {
+  const url = DOM.supabaseUrlInput.value.trim();
+  const anonKey = DOM.supabaseAnonKeyInput.value.trim();
+
+  state.supabaseConfig = { url, anonKey };
+  localStorage.setItem('study_supabase_config', JSON.stringify(state.supabaseConfig));
+  initSupabaseClient();
+  closeSupabaseModal();
+  alert('🌐 Supabase Cloud 연동 설정이 저장되었습니다!');
+}
 
 function checkOnboarding() {
   if (!state.profile) {
@@ -160,14 +200,15 @@ function setupEventListeners() {
     });
   });
 
+  DOM.btnOpenSupabaseConfig.addEventListener('click', openSupabaseModal);
+  DOM.btnSaveSupabaseConfig.addEventListener('click', saveSupabaseConfig);
+
   DOM.btnSaveOnboarding.addEventListener('click', saveOnboarding);
   DOM.btnReOnboard.addEventListener('click', () => DOM.onboardingModal.classList.remove('hidden'));
 
-  // Export / Import Event Listeners
   DOM.btnExportData.addEventListener('click', exportData);
   DOM.importFileInput.addEventListener('change', importData);
 
-  // Debounced Auto Classifier
   DOM.bookTitleInput.addEventListener('input', (e) => {
     const title = e.target.value.trim();
     clearTimeout(state.debounceTimer);
@@ -180,6 +221,7 @@ function setupEventListeners() {
 
     state.debounceTimer = setTimeout(() => {
       runBuiltInSmartAIClassifier(title);
+      fetchGlobalDifficultyFromSupabase(title);
     }, 200);
   });
 
@@ -206,7 +248,32 @@ function setupEventListeners() {
   DOM.btnSavePreset.addEventListener('click', saveNewPreset);
 }
 
-// 1. Data Backup (Export)
+// Supabase Global Crowdsourced Fetching
+async function fetchGlobalDifficultyFromSupabase(bookTitle) {
+  if (!state.supabaseClient) return;
+
+  try {
+    const { data, error } = await state.supabaseClient
+      .from('study_logs')
+      .select('actual_min, problem_count')
+      .ilike('book_title', `%${bookTitle}%`)
+      .limit(50);
+
+    if (error || !data || data.length === 0) return;
+
+    // Calculate Crowdsourced Global Average Difficulty Weight
+    const avgMinsPerProblem = data.reduce((acc, row) => acc + (row.actual_min / Math.max(1, row.problem_count)), 0) / data.length;
+    const globalWeight = Math.max(0.8, Math.min(3.0, avgMinsPerProblem / 2.5));
+
+    DOM.autoAnalysisTag.innerHTML = `<i class="fa-solid fa-globe" style="color:var(--primary)"></i> <strong>Supabase 집단지성 ${data.length}건 데이터 반영:</strong> [${bookTitle}] 글로벌 난이도 가중치 (${globalWeight.toFixed(1)}x)`;
+    setSliderAndBadge(globalWeight);
+    recalculatePrediction();
+  } catch (err) {
+    console.log('Supabase fetch passive bypass', err);
+  }
+}
+
+// Data Export & Import
 function exportData() {
   const backupObj = {
     version: '2.0',
@@ -214,7 +281,8 @@ function exportData() {
     profile: state.profile,
     presets: state.presets,
     subjectAlphas: state.subjectAlphas,
-    history: state.history
+    history: state.history,
+    supabaseConfig: state.supabaseConfig
   };
 
   const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupObj, null, 2));
@@ -226,7 +294,6 @@ function exportData() {
   downloadAnchor.remove();
 }
 
-// 1. Data Restoration (Import)
 function importData(event) {
   const fileReader = new FileReader();
   fileReader.onload = (e) => {
@@ -236,12 +303,15 @@ function importData(event) {
       if (importedData.presets) state.presets = importedData.presets;
       if (importedData.subjectAlphas) state.subjectAlphas = importedData.subjectAlphas;
       if (importedData.history) state.history = importedData.history;
+      if (importedData.supabaseConfig) state.supabaseConfig = importedData.supabaseConfig;
 
       localStorage.setItem('study_user_profile', JSON.stringify(state.profile));
       localStorage.setItem('study_presets', JSON.stringify(state.presets));
       localStorage.setItem('study_subject_alphas', JSON.stringify(state.subjectAlphas));
       localStorage.setItem('study_history', JSON.stringify(state.history));
+      localStorage.setItem('study_supabase_config', JSON.stringify(state.supabaseConfig));
 
+      initSupabaseClient();
       updateProfileBar();
       renderPresetList();
       renderHistory();
@@ -317,7 +387,6 @@ function adjustCount(delta) {
   recalculatePrediction();
 }
 
-// Core Prediction Calculator Engine
 function calculatePrediction() {
   const problemCount = parseInt(DOM.problemCountInput.value) || 1;
   const difficultyWeight = parseFloat(DOM.difficultySlider.value) || 1.5;
@@ -337,7 +406,6 @@ function calculatePrediction() {
 
   const pureStudyMin = Math.round((solveTimeRaw + reviewTimeRaw) * alpha);
   
-  // Pomodoro Rest Calculation (10 mins rest every 50 mins)
   let restMin = 0;
   if (isPomodoro && pureStudyMin >= 50) {
     restMin = Math.floor(pureStudyMin / 50) * 10;
@@ -377,11 +445,9 @@ function recalculatePrediction() {
     DOM.skillMultVal.textContent = `${state.profile.skillMult}x`;
   }
 
-  // 2. Real-time Target Finish Clock Calculation
   calculateTargetClock(pred.totalPredictedMin);
 }
 
-// 2. Target Finish Clock Calculation
 function calculateTargetClock(totalPredictedMin) {
   const now = new Date();
   const finishTime = new Date(now.getTime() + totalPredictedMin * 60 * 1000);
@@ -396,7 +462,6 @@ function calculateTargetClock(totalPredictedMin) {
   DOM.targetFinishClock.innerHTML = `<i class="fa-solid fa-clock"></i> <strong>${period} ${hrs}:${mins}</strong> 에 공부가 완료될 예정입니다!`;
 }
 
-// Presets Dropdown
 function togglePresetDropdown() {
   if (DOM.presetDropdown.classList.contains('hidden')) {
     renderPresetDropdown();
@@ -430,7 +495,6 @@ function selectPreset(presetId) {
   recalculatePrediction();
 }
 
-// Timer Functions
 function startTimerSession() {
   const bookTitle = DOM.bookTitleInput.value.trim() || '미지정 교재';
   const pred = calculatePrediction();
@@ -509,8 +573,8 @@ function closeFeedbackModal() {
   DOM.feedbackModal.classList.add('hidden');
 }
 
-// 4. Subject-specific Alpha Correction Update & Feedback Submit
-function submitSessionFeedback() {
+// Feedback Submit & Send to Supabase Cloud
+async function submitSessionFeedback() {
   const actualMin = parseInt(DOM.actualTimeInput.value) || 1;
   const wrongCount = parseInt(DOM.actualWrongInput.value) || 0;
   const session = state.timer.sessionData;
@@ -519,7 +583,6 @@ function submitSessionFeedback() {
   const errorRatio = actualMin / predictedMin;
   const subject = session.subject || '일반';
 
-  // Subject-specific Alpha Correction Update
   const oldAlpha = state.subjectAlphas[subject] || 1.0;
   const newAlpha = Math.max(0.5, Math.min(3.0, (oldAlpha * 0.7) + (errorRatio * 0.3)));
   state.subjectAlphas[subject] = newAlpha;
@@ -540,14 +603,30 @@ function submitSessionFeedback() {
   state.history.unshift(newLog);
   localStorage.setItem('study_history', JSON.stringify(state.history));
 
+  // Send Anonymous Session Record to Supabase
+  if (state.supabaseClient) {
+    try {
+      await state.supabaseClient.from('study_logs').insert([{
+        book_title: session.bookTitle,
+        subject,
+        problem_count: session.problemCount,
+        predicted_min: predictedMin,
+        actual_min: actualMin,
+        wrong_count: wrongCount
+      }]);
+      console.log('Successfully synced session to Supabase Crowdsourced Cloud!');
+    } catch (e) {
+      console.log('Supabase sync passive bypass', e);
+    }
+  }
+
   closeFeedbackModal();
   renderHistory();
   recalculatePrediction();
 
-  alert(`학습 기록이 저장되었습니다!\n[${subject}] 과목의 보정 가중치(α): ${oldAlpha.toFixed(2)} -> ${newAlpha.toFixed(2)}`);
+  alert(`학습 기록이 저장되었습니다!\n[${subject}] 과목 보정 알파(α): ${oldAlpha.toFixed(2)} -> ${newAlpha.toFixed(2)}`);
 }
 
-// Presets CRUD
 function renderPresetList() {
   if (state.presets.length === 0) {
     DOM.presetListGrid.innerHTML = `<p style="color:var(--text-muted)">등록된 교재 프리셋이 없습니다.</p>`;
@@ -606,7 +685,6 @@ function closePresetModal() {
   DOM.presetModal.classList.add('hidden');
 }
 
-// 5. Subject Breakdown Visualizer & History Render
 function renderHistory() {
   const logs = state.history;
   DOM.statTotalCount.textContent = `${logs.length}회`;
@@ -626,7 +704,6 @@ function renderHistory() {
   const accuracy = Math.max(0, 100 - Math.abs(avgRatio - 100));
   DOM.statAccuracy.textContent = `${accuracy.toFixed(0)}%`;
 
-  // Render Subject Breakdown Bar
   const subjectTotals = {};
   logs.forEach(log => {
     const subj = log.subject || '일반';
@@ -653,7 +730,6 @@ function renderHistory() {
   `).join('');
 }
 
-// 5. Render Subject Progress Segments & Legends
 function renderSubjectBreakdown(subjectTotals) {
   const total = Object.values(subjectTotals).reduce((a, b) => a + b, 0);
 
