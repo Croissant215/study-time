@@ -312,29 +312,48 @@ select:focus {
   font-weight: 600;
 }
 
+/* Remove Browser Default Spin Buttons for Number Inputs */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 /* Number Input Group (+/- Buttons) */
 .number-input-group {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
 }
 
 .number-input-group input {
   text-align: center;
-  font-size: 1.15rem;
+  font-size: 1.2rem;
   font-weight: 800;
+  min-width: 70px;
+  padding: 12px 6px !important;
+  color: var(--text-main);
+  border: 2px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
 }
 
 .btn-num {
   background: var(--bg-card-sub);
   border: 1px solid var(--border-subtle);
   color: var(--text-main);
-  padding: 12px 16px;
+  padding: 12px 14px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   font-weight: 700;
   transition: background 0.2s;
+  flex-shrink: 0;
 }
+
 
 .btn-num:hover {
   background: #E8DFD3;
@@ -784,16 +803,20 @@ input[type="range"] {
 
   .number-input-group {
     justify-content: space-between;
+    gap: 4px;
   }
 
   .number-input-group input {
-    width: 60px;
+    min-width: 55px;
+    padding: 10px 4px !important;
+    font-size: 1.1rem;
   }
 
   .btn-num {
-    padding: 10px 10px;
-    font-size: 0.85rem;
+    padding: 10px 8px;
+    font-size: 0.8rem;
   }
+
 
   .slider-labels {
     font-size: 0.65rem;
