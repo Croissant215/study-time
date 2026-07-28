@@ -21,9 +21,10 @@ const state = {
   },
   history: JSON.parse(localStorage.getItem('study_history')) || [],
   supabaseConfig: JSON.parse(localStorage.getItem('study_supabase_config')) || {
-    url: '',
-    anonKey: ''
+    url: 'https://ioyjbdhkzyatgurqvsmz.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlveWpiZGhrenlhdGd1cnF2c216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMjc4OTMsImV4cCI6MjEwMDgwMzg5M30.noBv8DJtCmoL5JpBniS2HkvPd-rpW1Vqgnt69JKwJUo'
   },
+
   supabaseClient: null,
   timer: {
     intervalId: null,
@@ -125,17 +126,24 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initSupabaseClient() {
+  if (!state.supabaseConfig.url || !state.supabaseConfig.anonKey) {
+    state.supabaseConfig.url = 'https://ioyjbdhkzyatgurqvsmz.supabase.co';
+    state.supabaseConfig.anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlveWpiZGhrenlhdGd1cnF2c216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMjc4OTMsImV4cCI6MjEwMDgwMzg5M30.noBv8DJtCmoL5JpBniS2HkvPd-rpW1Vqgnt69JKwJUo';
+    localStorage.setItem('study_supabase_config', JSON.stringify(state.supabaseConfig));
+  }
+
   if (state.supabaseConfig.url && state.supabaseConfig.anonKey && window.supabase) {
     try {
       state.supabaseClient = window.supabase.createClient(state.supabaseConfig.url, state.supabaseConfig.anonKey);
-      DOM.supabaseStatusBadge.innerHTML = `<i class="fa-solid fa-cloud-check" style="color:var(--secondary)"></i> Supabase Cloud: 연결됨`;
+      DOM.supabaseStatusBadge.innerHTML = `<i class="fa-solid fa-cloud-check" style="color:var(--secondary)"></i> Supabase Cloud: 자동 연결됨`;
     } catch (e) {
-      DOM.supabaseStatusBadge.innerHTML = `<i class="fa-solid fa-cloud" style="color:var(--text-muted)"></i> Supabase Cloud: 대기중`;
+      DOM.supabaseStatusBadge.innerHTML = `<i class="fa-solid fa-cloud" style="color:var(--text-muted)"></i> Supabase Cloud: 연결 대기`;
     }
   } else {
-    DOM.supabaseStatusBadge.innerHTML = `<i class="fa-solid fa-cloud" style="color:var(--text-muted)"></i> Supabase Cloud: 대기중 (클릭하여 연동)`;
+    DOM.supabaseStatusBadge.innerHTML = `<i class="fa-solid fa-cloud" style="color:var(--text-muted)"></i> Supabase Cloud: 연결 대기`;
   }
 }
+
 
 function openSupabaseModal() {
   DOM.supabaseUrlInput.value = state.supabaseConfig.url || '';
