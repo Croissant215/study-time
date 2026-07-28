@@ -82,8 +82,8 @@ const DOM = {
   btnReOnboard: document.getElementById('btn-re-onboard'),
   barUserName: document.getElementById('bar-user-name'),
   barSkillLevel: document.getElementById('bar-skill-level'),
-  btnToggleMobileView: document.getElementById('btn-toggle-mobile-view'),
   bookTitleInput: document.getElementById('book-title'),
+
 
   btnSelectPreset: document.getElementById('btn-select-preset'),
   presetDropdown: document.getElementById('preset-dropdown'),
@@ -177,15 +177,8 @@ function setupEventListeners() {
   DOM.btnSaveOnboarding.addEventListener('click', saveOnboarding);
   DOM.btnReOnboard.addEventListener('click', () => DOM.onboardingModal.classList.remove('hidden'));
 
-  // Mobile View Toggle for Orca IDE Preview
-  if (DOM.btnToggleMobileView) {
-    DOM.btnToggleMobileView.addEventListener('click', () => {
-      document.querySelector('.app-container').classList.toggle('mobile-preview-mode');
-    });
-  }
-
-
   // Debounced Built-in Smart AI Classifier
+
   DOM.bookTitleInput.addEventListener('input', (e) => {
     const title = e.target.value.trim();
     clearTimeout(state.debounceTimer);
