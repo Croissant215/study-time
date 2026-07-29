@@ -535,15 +535,15 @@ function calculatePrediction() {
   const skillMult = state.profile ? state.profile.skillMult : 1.0;
   const alpha = state.subjectAlphas[subject] || 1.0;
 
-  // 1. Pure Solving Time Calculation
-  const solveTimeRaw = problemCount * 2.5 * difficultyWeight * skillMult;
+  // 1. Pure Solving Time Calculation (Base per-problem time adjusted to 1.5 mins)
+  const solveTimeRaw = problemCount * 1.5 * difficultyWeight * skillMult;
   
   // 2. Optional Error Review Calculation
   let reviewTimeRaw = 0;
   let estimatedWrongCount = 0;
   if (isReviewTimeEnabled) {
     const errorRatePercent = parseFloat(DOM.errorRateSlider?.value) || 20;
-    const wrongReviewTimeMin = parseInt(DOM.wrongReviewTimeInput?.value) || 5;
+    const wrongReviewTimeMin = parseInt(DOM.wrongReviewTimeInput?.value) || 3;
     estimatedWrongCount = problemCount * (errorRatePercent / 100);
     reviewTimeRaw = estimatedWrongCount * wrongReviewTimeMin;
   }
