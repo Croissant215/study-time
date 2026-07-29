@@ -50,7 +50,7 @@
         
         <!-- Supabase Auth UI -->
         <button type="button" id="btn-open-auth" class="btn btn-primary btn-sm" onclick="openAuthModal()">
-          <i class="fa-solid fa-user-lock"></i> 보안 로그인
+          <i class="fa-solid fa-user-lock"></i> 로그인
         </button>
         <div id="user-auth-badge" class="hidden" style="display:inline-flex; align-items:center; gap:8px;">
           <span id="user-email-display" class="badge badge-accent" style="font-size:0.85rem;"><i class="fa-solid fa-user-check"></i> 로그인됨</span>
@@ -415,11 +415,11 @@
         <button type="button" id="btn-save-preset" class="btn btn-primary">등록하기</button>
       </div>
     </div>
-  <!-- 모달: Supabase 보안 로그인 & 계정 -->
+  <!-- 모달: Supabase 로그인 & 계정 -->
   <div id="auth-modal" class="modal-backdrop hidden">
     <div class="modal-card">
       <div class="modal-header">
-        <h3><i class="fa-solid fa-shield-halved" style="color:var(--primary);"></i> Supabase 보안 로그인</h3>
+        <h3><i class="fa-solid fa-shield-halved" style="color:var(--primary);"></i> Supabase 로그인</h3>
         <button type="button" class="btn-close" onclick="closeAuthModal()"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="modal-body">

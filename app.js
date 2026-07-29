@@ -1034,7 +1034,7 @@ async function handleAuthSubmit() {
     if (state.authMode === 'login') {
       const { data, error } = await state.supabaseClient.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      alert(`🎉 반가워요, ${data.user.email} 님! 보안 로그인되었습니다.`);
+      alert(`🎉 반가워요, ${data.user.email} 님! 로그인되었습니다.`);
       closeAuthModal();
     } else {
       const { data, error } = await state.supabaseClient.auth.signUp({ email, password });
