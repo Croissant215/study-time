@@ -1022,7 +1022,7 @@ function handleAuthSubmit() {
   const username = usernameInput?.value.trim() || email?.split('@')[0] || '학습자';
 
   if (!email || !password) {
-    alert('아이디/이메일과 비밀번호를 모두 입력해주세요.');
+    alert('아이디와 비밀번호를 모두 입력해주세요.');
     return;
   }
 
@@ -1031,7 +1031,7 @@ function handleAuthSubmit() {
   if (state.authMode === 'signup') {
     const existing = users.find(u => u && u.email && u.email.toLowerCase() === email.toLowerCase());
     if (existing) {
-      alert('❌ 이미 존재하는 아이디/이메일입니다. 다른 아이디로 가입해주세요.');
+      alert('❌ 이미 존재하는 아이디입니다. 다른 아이디로 가입해주세요.');
       return;
     }
     const newUser = { id: 'user-' + Date.now(), email, username, password };

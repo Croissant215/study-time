@@ -299,6 +299,7 @@ input[type="file"].hidden,
 }
 
 input[type="text"],
+input[type="password"],
 input[type="number"],
 select {
   width: 100%;
@@ -315,6 +316,7 @@ select {
 }
 
 input[type="text"]:focus,
+input[type="password"]:focus,
 input[type="number"]:focus,
 select:focus {
   border-color: var(--primary);
