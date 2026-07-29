@@ -47,12 +47,12 @@
         <input type="file" id="import-file-input" accept=".json" class="hidden">
         
         <!-- Auth UI -->
-        <button type="button" id="btn-open-auth" class="btn btn-primary btn-sm" onclick="openAuthModal()">
+        <button type="button" id="btn-open-auth" class="btn btn-primary btn-sm">
           <i class="fa-solid fa-user"></i> 로그인
         </button>
-        <div id="user-auth-badge" class="hidden" style="display:inline-flex; align-items:center; gap:8px;">
-          <span id="user-email-display" class="badge badge-accent" style="font-size:0.85rem;"><i class="fa-solid fa-user-check"></i> 열공이</span>
-          <button type="button" id="btn-logout" class="btn btn-secondary btn-sm" onclick="handleLogout()"><i class="fa-solid fa-right-from-bracket"></i> 로그아웃</button>
+        <div id="user-auth-badge" class="hidden" style="display:inline-flex; align-items:center; gap:8px; height:100%;">
+          <span id="user-email-display" class="badge badge-accent" style="font-size:0.85rem; padding:8px 12px; display:inline-flex; align-items:center; gap:6px; line-height:1;"><i class="fa-solid fa-user-check"></i> 열공이</span>
+          <button type="button" id="btn-logout" class="btn btn-secondary btn-sm"><i class="fa-solid fa-right-from-bracket"></i> 로그아웃</button>
         </div>
       </div>
     </header>
@@ -443,7 +443,7 @@
             <input type="password" id="auth-password" placeholder="비밀번호 입력" required autocomplete="current-password">
           </div>
           
-          <button type="button" id="btn-submit-auth" class="btn btn-primary btn-large" style="width:100%; margin-top:8px;" onclick="handleAuthSubmit()">
+          <button type="submit" id="btn-submit-auth" class="btn btn-primary btn-large" style="width:100%; margin-top:8px;">
             <i class="fa-solid fa-right-to-bracket"></i> 로그인
           </button>
         </form>

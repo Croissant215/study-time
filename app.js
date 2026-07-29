@@ -278,14 +278,16 @@ function setupEventListeners() {
   DOM.btnOpenAddPreset?.addEventListener('click', () => DOM.presetModal?.classList.remove('hidden'));
   DOM.btnSavePreset?.addEventListener('click', saveNewPreset);
 
-  // PWA Notification & Supabase Auth Event Listeners
+  // PWA Notification & Auth Event Listeners
   DOM.btnPwaNoti?.addEventListener('click', requestNotificationPermission);
   DOM.btnOpenAuth?.addEventListener('click', openAuthModal);
   DOM.btnLogout?.addEventListener('click', handleLogout);
   DOM.tabAuthLogin?.addEventListener('click', () => switchAuthTab('login'));
   DOM.tabAuthSignup?.addEventListener('click', () => switchAuthTab('signup'));
-  DOM.btnSubmitAuth?.addEventListener('click', handleAuthSubmit);
-  DOM.btnGoogleOauth?.addEventListener('click', handleGoogleOAuth);
+  DOM.authForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    handleAuthSubmit();
+  });
 }
 
 // Supabase Global Crowdsourced Fetching
@@ -1013,6 +1015,9 @@ function switchAuthTab(mode) {
 window.switchAuthTab = switchAuthTab;
 
 function handleAuthSubmit() {
+  if (state.isAuthProcessing) return;
+  state.isAuthProcessing = true;
+
   const emailInput = DOM.authEmail || document.getElementById('auth-email');
   const passwordInput = DOM.authPassword || document.getElementById('auth-password');
   const usernameInput = DOM.authUsername || document.getElementById('auth-username');
@@ -1023,6 +1028,7 @@ function handleAuthSubmit() {
 
   if (!email || !password) {
     alert('아이디와 비밀번호를 모두 입력해주세요.');
+    state.isAuthProcessing = false;
     return;
   }
 
@@ -1032,6 +1038,7 @@ function handleAuthSubmit() {
     const existing = users.find(u => u && u.email && u.email.toLowerCase() === email.toLowerCase());
     if (existing) {
       alert('❌ 이미 존재하는 아이디입니다. 다른 아이디로 가입해주세요.');
+      state.isAuthProcessing = false;
       return;
     }
     const newUser = { id: 'user-' + Date.now(), email, username, password };
@@ -1047,6 +1054,7 @@ function handleAuthSubmit() {
     const user = users.find(u => u && u.email && u.email.toLowerCase() === email.toLowerCase() && u.password === password);
     if (!user) {
       alert('❌ 아이디 또는 비밀번호가 일치하지 않습니다.');
+      state.isAuthProcessing = false;
       return;
     }
     localStorage.setItem('study_current_user', JSON.stringify(user));
@@ -1054,14 +1062,23 @@ function handleAuthSubmit() {
     alert(`🎉 로그인되었습니다. 반가워요, ${user.username || user.email} 님!`);
     closeAuthModal();
   }
+  
+  setTimeout(() => {
+    state.isAuthProcessing = false;
+  }, 500);
 }
 
 window.handleAuthSubmit = handleAuthSubmit;
 
 function handleLogout() {
+  if (state.isLoggingOut) return;
+  state.isLoggingOut = true;
   localStorage.removeItem('study_current_user');
   updateAuthUI(null);
   alert('👋 성공적으로 로그아웃되었습니다.');
+  setTimeout(() => {
+    state.isLoggingOut = false;
+  }, 500);
 }
 
 window.handleLogout = handleLogout;
