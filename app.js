@@ -28,11 +28,17 @@ const state = {
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlveWpiZGhrenlhdGd1cnF2c216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMjc4OTMsImV4cCI6MjEwMDgwMzg5M30.noBv8DJtCmoL5JpBniS2HkvPd-rpW1Vqgnt69JKwJUo'
   },
   supabaseClient: null,
+  authUser: null,
+  authMode: 'login', // 'login' or 'signup'
   timer: {
-    intervalId: null,
+    worker: null,
+    startTime: null,
+    pauseStartTime: null,
+    totalPausedMs: 0,
     seconds: 0,
     isPaused: false,
-    sessionData: null
+    sessionData: null,
+    notificationSent: false
   },
   debounceTimer: null
 };
@@ -115,13 +121,31 @@ const DOM = {
   statAccuracy: document.getElementById('stat-accuracy'),
   statTotalHours: document.getElementById('stat-total-hours'),
   subjectProgressBar: document.getElementById('subject-progress-bar'),
-  subjectLegend: document.getElementById('subject-legend')
+  subjectLegend: document.getElementById('subject-legend'),
+  
+  // PWA & Supabase Auth DOM
+  btnPwaNoti: document.getElementById('btn-pwa-noti'),
+  notiBtnText: document.getElementById('noti-btn-text'),
+  btnOpenAuth: document.getElementById('btn-open-auth'),
+  userAuthBadge: document.getElementById('user-auth-badge'),
+  userEmailDisplay: document.getElementById('user-email-display'),
+  btnLogout: document.getElementById('btn-logout'),
+  authModal: document.getElementById('auth-modal'),
+  tabAuthLogin: document.getElementById('tab-auth-login'),
+  tabAuthSignup: document.getElementById('tab-auth-signup'),
+  authForm: document.getElementById('auth-form'),
+  authEmail: document.getElementById('auth-email'),
+  authPassword: document.getElementById('auth-password'),
+  btnSubmitAuth: document.getElementById('btn-submit-auth'),
+  btnGoogleOauth: document.getElementById('btn-google-oauth')
 };
 
 // Initialize Application
 document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
   initSupabaseClient();
+  initPWAAndNotifications();
+  checkSupabaseAuthSession();
   checkOnboarding();
   renderPresetList();
   renderHistory();
@@ -254,6 +278,15 @@ function setupEventListeners() {
   DOM.btnSubmitFeedback?.addEventListener('click', submitSessionFeedback);
   DOM.btnOpenAddPreset?.addEventListener('click', () => DOM.presetModal?.classList.remove('hidden'));
   DOM.btnSavePreset?.addEventListener('click', saveNewPreset);
+
+  // PWA Notification & Supabase Auth Event Listeners
+  DOM.btnPwaNoti?.addEventListener('click', requestNotificationPermission);
+  DOM.btnOpenAuth?.addEventListener('click', openAuthModal);
+  DOM.btnLogout?.addEventListener('click', handleLogout);
+  DOM.tabAuthLogin?.addEventListener('click', () => switchAuthTab('login'));
+  DOM.tabAuthSignup?.addEventListener('click', () => switchAuthTab('signup'));
+  DOM.btnSubmitAuth?.addEventListener('click', handleAuthSubmit);
+  DOM.btnGoogleOauth?.addEventListener('click', handleGoogleOAuth);
 }
 
 // Supabase Global Crowdsourced Fetching
@@ -527,10 +560,14 @@ function startTimerSession() {
     predictedMin: pred.totalPredictedMin
   };
 
+  state.timer.startTime = Date.now();
+  state.timer.pauseStartTime = null;
+  state.timer.totalPausedMs = 0;
   state.timer.seconds = 0;
   state.timer.isPaused = false;
-  if (DOM.btnPauseTimer) DOM.btnPauseTimer.innerHTML = `<i class="fa-solid fa-pause"></i> 일시정지`;
+  state.timer.notificationSent = false;
 
+  if (DOM.btnPauseTimer) DOM.btnPauseTimer.innerHTML = `<i class="fa-solid fa-pause"></i> 일시정지`;
   if (DOM.activeBookDisplay) DOM.activeBookDisplay.textContent = `${bookTitle} (${pred.problemCount}문제)`;
   if (DOM.timerTargetTime) DOM.timerTargetTime.textContent = `${pred.totalPredictedMin}분`;
 
@@ -538,17 +575,78 @@ function startTimerSession() {
   DOM.activeTimerPanel?.classList.remove('hidden');
 
   updateTimerDisplay();
+
+  // Initialize Web Worker for Background Tick
+  if (window.Worker) {
+    if (state.timer.worker) state.timer.worker.terminate();
+    try {
+      state.timer.worker = new Worker('timer-worker.js');
+      state.timer.worker.onmessage = (e) => {
+        if (e.data.type === 'TICK' && !state.timer.isPaused) {
+          calculateElapsedSeconds();
+        }
+      };
+      state.timer.worker.postMessage({ command: 'START', interval: 1000 });
+    } catch (err) {
+      // Fallback if Worker fails
+      startFallbackTimerInterval();
+    }
+  } else {
+    startFallbackTimerInterval();
+  }
+}
+
+function startFallbackTimerInterval() {
+  if (state.timer.intervalId) clearInterval(state.timer.intervalId);
   state.timer.intervalId = setInterval(() => {
     if (!state.timer.isPaused) {
-      state.timer.seconds++;
-      updateTimerDisplay();
+      calculateElapsedSeconds();
     }
   }, 1000);
 }
 
+function calculateElapsedSeconds() {
+  if (!state.timer.startTime) return;
+  const now = Date.now();
+  const currentPausedMs = state.timer.isPaused && state.timer.pauseStartTime ? (now - state.timer.pauseStartTime) : 0;
+  const effectiveMs = now - state.timer.startTime - state.timer.totalPausedMs - currentPausedMs;
+  state.timer.seconds = Math.max(0, Math.floor(effectiveMs / 1000));
+  updateTimerDisplay();
+
+  // Background Notification check on target finish
+  if (state.timer.sessionData && !state.timer.notificationSent) {
+    const targetSecs = state.timer.sessionData.predictedMin * 60;
+    if (state.timer.seconds >= targetSecs && targetSecs > 0) {
+      state.timer.notificationSent = true;
+      sendBackgroundNotification(
+        `⏱️ [StudyPredict] 공부시간 완료!`,
+        {
+          body: `'${state.timer.sessionData.bookTitle}' 목표시간 (${state.timer.sessionData.predictedMin}분)에 도달했습니다!`,
+          icon: 'https://cdn-icons-png.flaticon.com/512/3426/3426653.png'
+        }
+      );
+    }
+  }
+}
+
 function togglePauseTimer() {
-  state.timer.isPaused = !state.timer.isPaused;
-  if (DOM.btnPauseTimer) DOM.btnPauseTimer.innerHTML = state.timer.isPaused ? `<i class="fa-solid fa-play"></i> 재개` : `<i class="fa-solid fa-pause"></i> 일시정지`;
+  const now = Date.now();
+  if (state.timer.isPaused) {
+    // Resume
+    if (state.timer.pauseStartTime) {
+      state.timer.totalPausedMs += (now - state.timer.pauseStartTime);
+      state.timer.pauseStartTime = null;
+    }
+    state.timer.isPaused = false;
+    if (DOM.btnPauseTimer) DOM.btnPauseTimer.innerHTML = `<i class="fa-solid fa-pause"></i> 일시정지`;
+    if (state.timer.worker) state.timer.worker.postMessage({ command: 'START', interval: 1000 });
+  } else {
+    // Pause
+    state.timer.pauseStartTime = now;
+    state.timer.isPaused = true;
+    if (DOM.btnPauseTimer) DOM.btnPauseTimer.innerHTML = `<i class="fa-solid fa-play"></i> 재개`;
+    if (state.timer.worker) state.timer.worker.postMessage({ command: 'PAUSE' });
+  }
 }
 
 function updateTimerDisplay() {
@@ -560,7 +658,16 @@ function updateTimerDisplay() {
 }
 
 function stopTimerSession() {
-  clearInterval(state.timer.intervalId);
+  if (state.timer.worker) {
+    state.timer.worker.postMessage({ command: 'STOP' });
+    state.timer.worker.terminate();
+    state.timer.worker = null;
+  }
+  if (state.timer.intervalId) {
+    clearInterval(state.timer.intervalId);
+    state.timer.intervalId = null;
+  }
+
   const actualMinutes = Math.max(1, Math.round(state.timer.seconds / 60));
   
   DOM.activeTimerPanel?.classList.add('hidden');
@@ -782,4 +889,175 @@ function deleteHistoryLog(id) {
   state.history = state.history.filter(h => h.id !== id);
   localStorage.setItem('study_history', JSON.stringify(state.history));
   renderHistory();
+}
+
+// --- PWA & Background Notification Functions ---
+function initPWAAndNotifications() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      console.log('PWA ServiceWorker registered:', reg);
+    }).catch(err => {
+      console.warn('PWA ServiceWorker registration failed:', err);
+    });
+  }
+  updateNotificationButtonState();
+}
+
+function updateNotificationButtonState() {
+  if (!DOM.notiBtnText) return;
+  if (!('Notification' in window)) {
+    DOM.notiBtnText.textContent = '알림 미지원';
+    return;
+  }
+  if (Notification.permission === 'granted') {
+    DOM.notiBtnText.textContent = '알림 허용됨';
+    DOM.btnPwaNoti?.classList.remove('btn-secondary');
+    DOM.btnPwaNoti?.classList.add('btn-primary');
+  } else {
+    DOM.notiBtnText.textContent = '알림 허용';
+  }
+}
+
+function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    alert('현재 브라우저가 데스크톱/백그라운드 알림을 지원하지 않습니다.');
+    return;
+  }
+  Notification.requestPermission().then(permission => {
+    updateNotificationButtonState();
+    if (permission === 'granted') {
+      sendBackgroundNotification('🔔 백그라운드 알림 활성화!', {
+        body: '타이머가 완료되면 백그라운드에서도 즉시 알림이 발송됩니다.',
+        icon: 'https://cdn-icons-png.flaticon.com/512/3426/3426653.png'
+      });
+    }
+  });
+}
+
+function sendBackgroundNotification(title, options) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.ready.then(reg => {
+      reg.showNotification(title, options);
+    });
+  } else {
+    new Notification(title, options);
+  }
+}
+
+// --- Supabase Authentication Functions ---
+async function checkSupabaseAuthSession() {
+  if (!state.supabaseClient) return;
+  try {
+    const { data: { session } } = await state.supabaseClient.auth.getSession();
+    if (session && session.user) {
+      updateAuthUI(session.user);
+    } else {
+      updateAuthUI(null);
+    }
+
+    state.supabaseClient.auth.onAuthStateChange((event, session) => {
+      if (session && session.user) {
+        updateAuthUI(session.user);
+      } else {
+        updateAuthUI(null);
+      }
+    });
+  } catch (err) {
+    updateAuthUI(null);
+  }
+}
+
+function updateAuthUI(user) {
+  state.authUser = user;
+  if (user) {
+    if (DOM.btnOpenAuth) DOM.btnOpenAuth.classList.add('hidden');
+    if (DOM.userAuthBadge) DOM.userAuthBadge.classList.remove('hidden');
+    if (DOM.userEmailDisplay) DOM.userEmailDisplay.innerHTML = `<i class="fa-solid fa-user-check"></i> ${user.email.split('@')[0]}`;
+  } else {
+    if (DOM.btnOpenAuth) DOM.btnOpenAuth.classList.remove('hidden');
+    if (DOM.userAuthBadge) DOM.userAuthBadge.classList.add('hidden');
+  }
+}
+
+function openAuthModal() {
+  DOM.authModal?.classList.remove('hidden');
+}
+
+function closeAuthModal() {
+  DOM.authModal?.classList.add('hidden');
+}
+
+function switchAuthTab(mode) {
+  state.authMode = mode;
+  if (mode === 'login') {
+    DOM.tabAuthLogin?.classList.add('active');
+    DOM.tabAuthSignup?.classList.remove('active');
+    if (DOM.btnSubmitAuth) DOM.btnSubmitAuth.innerHTML = `<i class="fa-solid fa-right-to-bracket"></i> 이메일 로그인`;
+  } else {
+    DOM.tabAuthSignup?.classList.add('active');
+    DOM.tabAuthLogin?.classList.remove('active');
+    if (DOM.btnSubmitAuth) DOM.btnSubmitAuth.innerHTML = `<i class="fa-solid fa-user-plus"></i> 이메일 회원가입`;
+  }
+}
+
+async function handleAuthSubmit() {
+  if (!state.supabaseClient) {
+    alert('Supabase 연동 클라이언트가 초기화되지 않았습니다.');
+    return;
+  }
+  const email = DOM.authEmail?.value.trim();
+  const password = DOM.authPassword?.value.trim();
+
+  if (!email || !password) {
+    alert('이메일과 비밀번호를 모두 입력해주세요.');
+    return;
+  }
+
+  if (password.length < 6) {
+    alert('비밀번호는 최소 6자리 이상이어야 합니다.');
+    return;
+  }
+
+  try {
+    if (state.authMode === 'login') {
+      const { data, error } = await state.supabaseClient.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      alert(`🎉 반가워요, ${data.user.email} 님! 보안 로그인되었습니다.`);
+      closeAuthModal();
+    } else {
+      const { data, error } = await state.supabaseClient.auth.signUp({ email, password });
+      if (error) throw error;
+      alert(`✉️ 회원가입 승인 또는 인증 이메일이 발송되었습니다. 로그인해주세요.`);
+      switchAuthTab('login');
+    }
+  } catch (err) {
+    alert(`❌ 인증 실패: ${err.message || err.error_description || '알 수 없는 오류가 발생했습니다.'}`);
+  }
+}
+
+async function handleGoogleOAuth() {
+  if (!state.supabaseClient) {
+    alert('Supabase 클라이언트가 설정되지 않았습니다.');
+    return;
+  }
+  try {
+    const { error } = await state.supabaseClient.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.href
+      }
+    });
+    if (error) throw error;
+  } catch (err) {
+    alert(`❌ Google OAuth 로그인 실패: ${err.message}`);
+  }
+}
+
+async function handleLogout() {
+  if (state.supabaseClient) {
+    await state.supabaseClient.auth.signOut();
+  }
+  updateAuthUI(null);
+  alert('👋 성공적으로 로그아웃되었습니다.');
 }
