@@ -13,8 +13,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- Supabase JS Client CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -40,21 +38,21 @@
         <button type="button" id="btn-pwa-noti" class="btn btn-secondary btn-sm" title="백그라운드 알림 허용">
           <i class="fa-solid fa-bell"></i> <span id="noti-btn-text">알림 허용</span>
         </button>
-        <button type="button" id="btn-export-data" class="btn btn-secondary btn-sm" title="데이터 JSON 백업">
+        <button type="button" id="btn-export-data" class="btn btn-secondary btn-sm" title="데이터 백업">
           <i class="fa-solid fa-download"></i> 백업
         </button>
-        <label for="import-file-input" class="btn btn-secondary btn-sm" title="데이터 JSON 복원" style="cursor:pointer; margin-bottom:0;">
+        <label for="import-file-input" class="btn btn-secondary btn-sm" title="데이터 복원" style="cursor:pointer; margin-bottom:0;">
           <i class="fa-solid fa-upload"></i> 복원
         </label>
         <input type="file" id="import-file-input" accept=".json" class="hidden">
         
-        <!-- Supabase Auth UI -->
+        <!-- Auth UI -->
         <button type="button" id="btn-open-auth" class="btn btn-primary btn-sm" onclick="openAuthModal()">
-          <i class="fa-solid fa-user-lock"></i> 로그인
+          <i class="fa-solid fa-user"></i> 로그인
         </button>
         <div id="user-auth-badge" class="hidden" style="display:inline-flex; align-items:center; gap:8px;">
-          <span id="user-email-display" class="badge badge-accent" style="font-size:0.85rem;"><i class="fa-solid fa-user-check"></i> 로그인됨</span>
-          <button type="button" id="btn-logout" class="btn btn-secondary btn-sm"><i class="fa-solid fa-right-from-bracket"></i> 로그아웃</button>
+          <span id="user-email-display" class="badge badge-accent" style="font-size:0.85rem;"><i class="fa-solid fa-user-check"></i> 열공이</span>
+          <button type="button" id="btn-logout" class="btn btn-secondary btn-sm" onclick="handleLogout()"><i class="fa-solid fa-right-from-bracket"></i> 로그아웃</button>
         </div>
       </div>
     </header>
@@ -415,48 +413,38 @@
         <button type="button" id="btn-save-preset" class="btn btn-primary">등록하기</button>
       </div>
     </div>
-  <!-- 모달: Supabase 로그인 & 계정 -->
+  <!-- 모달: 사용자 로그인 & 계정 -->
   <div id="auth-modal" class="modal-backdrop hidden">
     <div class="modal-card">
       <div class="modal-header">
-        <h3><i class="fa-solid fa-shield-halved" style="color:var(--primary);"></i> Supabase 로그인</h3>
+        <h3><i class="fa-solid fa-user-check" style="color:var(--primary);"></i> 학습 계정 로그인</h3>
         <button type="button" class="btn-close" onclick="closeAuthModal()"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="modal-body">
-        <div class="auth-notice-box" style="background:#F0FDF4; border:1px solid #BBF7D0; padding:12px; border-radius:8px; margin-bottom:16px; font-size:0.88rem; color:#166534;">
-          <i class="fa-solid fa-lock"></i> <strong>PKCE & JWT 표준 보안:</strong> 비밀번호는 암호화(Bcrypt) 처리되며, 보안 토큰이 백엔드 전용 API로 안전하게 보호됩니다.
-        </div>
-
         <!-- 탭 switch -->
         <div style="display:flex; gap:10px; margin-bottom:16px;">
-          <button type="button" id="tab-auth-login" class="btn btn-secondary btn-sm active" style="flex:1;">로그인</button>
-          <button type="button" id="tab-auth-signup" class="btn btn-secondary btn-sm" style="flex:1;">회원가입</button>
+          <button type="button" id="tab-auth-login" class="btn btn-secondary btn-sm active" style="flex:1;" onclick="switchAuthTab('login')">로그인</button>
+          <button type="button" id="tab-auth-signup" class="btn btn-secondary btn-sm" style="flex:1;" onclick="switchAuthTab('signup')">회원가입</button>
         </div>
 
-        <form id="auth-form" onsubmit="event.preventDefault();">
+        <form id="auth-form" onsubmit="event.preventDefault(); handleAuthSubmit();">
+          <div id="group-auth-username" class="form-group hidden">
+            <label for="auth-username">사용자 닉네임</label>
+            <input type="text" id="auth-username" placeholder="예: 열공이" autocomplete="nickname">
+          </div>
           <div class="form-group">
-            <label for="auth-email">이메일 주소</label>
-            <input type="email" id="auth-email" placeholder="example@domain.com" required autocomplete="email">
+            <label for="auth-email">아이디 / 이메일</label>
+            <input type="text" id="auth-email" placeholder="아이디 또는 이메일 입력" required autocomplete="username">
           </div>
           <div class="form-group">
             <label for="auth-password">비밀번호</label>
-            <input type="password" id="auth-password" placeholder="6자리 이상 입력" required autocomplete="current-password">
+            <input type="password" id="auth-password" placeholder="비밀번호 입력" required autocomplete="current-password">
           </div>
           
-          <button type="button" id="btn-submit-auth" class="btn btn-primary btn-large" style="width:100%; margin-top:8px;">
-            <i class="fa-solid fa-right-to-bracket"></i> 이메일 로그인
+          <button type="button" id="btn-submit-auth" class="btn btn-primary btn-large" style="width:100%; margin-top:8px;" onclick="handleAuthSubmit()">
+            <i class="fa-solid fa-right-to-bracket"></i> 로그인
           </button>
         </form>
-
-        <div style="margin:16px 0; text-align:center; position:relative;">
-          <hr style="border:0; border-top:1px solid var(--border-color);">
-          <span style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:#fff; padding:0 8px; font-size:0.8rem; color:var(--text-muted);">또는</span>
-        </div>
-
-        <!-- OAuth Google Login -->
-        <button type="button" id="btn-google-oauth" class="btn btn-secondary btn-large" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px;">
-          <i class="fa-brands fa-google" style="color:#EA4335;"></i> Google 계정으로 1초 로그인 (OAuth2)
-        </button>
       </div>
     </div>
   </div>

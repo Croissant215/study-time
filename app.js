@@ -143,9 +143,8 @@ const DOM = {
 // Initialize Application
 document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
-  initSupabaseClient();
   initPWAAndNotifications();
-  checkSupabaseAuthSession();
+  checkAuthSession();
   checkOnboarding();
   renderPresetList();
   renderHistory();
@@ -945,55 +944,36 @@ function sendBackgroundNotification(title, options) {
   }
 }
 
-// --- Supabase Authentication Functions ---
-async function checkSupabaseAuthSession() {
-  if (!state.supabaseClient) return;
-  try {
-    const { data: { session } } = await state.supabaseClient.auth.getSession();
-    if (session && session.user) {
-      updateAuthUI(session.user);
-    } else {
-      updateAuthUI(null);
-    }
-
-    state.supabaseClient.auth.onAuthStateChange((event, session) => {
-      if (session && session.user) {
-        updateAuthUI(session.user);
-      } else {
-        updateAuthUI(null);
-      }
-    });
-  } catch (err) {
-    updateAuthUI(null);
-  }
+// --- Custom Local Authentication Engine ---
+function checkAuthSession() {
+  const users = JSON.parse(localStorage.getItem('study_users')) || [];
+  const currentUser = JSON.parse(localStorage.getItem('study_current_user')) || null;
+  state.users = users;
+  updateAuthUI(currentUser);
 }
 
 function updateAuthUI(user) {
-  state.authUser = user;
+  state.currentUser = user;
   if (user) {
     if (DOM.btnOpenAuth) DOM.btnOpenAuth.classList.add('hidden');
     if (DOM.userAuthBadge) DOM.userAuthBadge.classList.remove('hidden');
-    if (DOM.userEmailDisplay) DOM.userEmailDisplay.innerHTML = `<i class="fa-solid fa-user-check"></i> ${user.email.split('@')[0]}`;
+    if (DOM.userEmailDisplay) DOM.userEmailDisplay.innerHTML = `<i class="fa-solid fa-user-check"></i> ${user.username || user.email}`;
+    if (DOM.barUserName) DOM.barUserName.textContent = user.username || user.email;
   } else {
     if (DOM.btnOpenAuth) DOM.btnOpenAuth.classList.remove('hidden');
     if (DOM.userAuthBadge) DOM.userAuthBadge.classList.add('hidden');
+    if (DOM.barUserName && state.profile) DOM.barUserName.textContent = state.profile.name || '열공이';
   }
 }
 
 function openAuthModal() {
-  if (DOM.authModal) {
-    DOM.authModal.classList.remove('hidden');
-  } else {
-    document.getElementById('auth-modal')?.classList.remove('hidden');
-  }
+  const modal = DOM.authModal || document.getElementById('auth-modal');
+  if (modal) modal.classList.remove('hidden');
 }
 
 function closeAuthModal() {
-  if (DOM.authModal) {
-    DOM.authModal.classList.add('hidden');
-  } else {
-    document.getElementById('auth-modal')?.classList.add('hidden');
-  }
+  const modal = DOM.authModal || document.getElementById('auth-modal');
+  if (modal) modal.classList.add('hidden');
 }
 
 window.openAuthModal = openAuthModal;
@@ -1001,74 +981,76 @@ window.closeAuthModal = closeAuthModal;
 
 function switchAuthTab(mode) {
   state.authMode = mode;
+  const groupUsername = DOM.groupAuthUsername || document.getElementById('group-auth-username');
+  const btnSubmit = DOM.btnSubmitAuth || document.getElementById('btn-submit-auth');
+  const tabLogin = DOM.tabAuthLogin || document.getElementById('tab-auth-login');
+  const tabSignup = DOM.tabAuthSignup || document.getElementById('tab-auth-signup');
+
   if (mode === 'login') {
-    DOM.tabAuthLogin?.classList.add('active');
-    DOM.tabAuthSignup?.classList.remove('active');
-    if (DOM.btnSubmitAuth) DOM.btnSubmitAuth.innerHTML = `<i class="fa-solid fa-right-to-bracket"></i> 이메일 로그인`;
+    tabLogin?.classList.add('active');
+    tabSignup?.classList.remove('active');
+    groupUsername?.classList.add('hidden');
+    if (btnSubmit) btnSubmit.innerHTML = `<i class="fa-solid fa-right-to-bracket"></i> 로그인`;
   } else {
-    DOM.tabAuthSignup?.classList.add('active');
-    DOM.tabAuthLogin?.classList.remove('active');
-    if (DOM.btnSubmitAuth) DOM.btnSubmitAuth.innerHTML = `<i class="fa-solid fa-user-plus"></i> 이메일 회원가입`;
+    tabSignup?.classList.add('active');
+    tabLogin?.classList.remove('active');
+    groupUsername?.classList.remove('hidden');
+    if (btnSubmit) btnSubmit.innerHTML = `<i class="fa-solid fa-user-plus"></i> 회원가입 완료`;
   }
 }
 
-async function handleAuthSubmit() {
-  if (!state.supabaseClient) {
-    alert('Supabase 연동 클라이언트가 초기화되지 않았습니다.');
-    return;
-  }
-  const email = DOM.authEmail?.value.trim();
-  const password = DOM.authPassword?.value.trim();
+window.switchAuthTab = switchAuthTab;
+
+function handleAuthSubmit() {
+  const emailInput = DOM.authEmail || document.getElementById('auth-email');
+  const passwordInput = DOM.authPassword || document.getElementById('auth-password');
+  const usernameInput = DOM.authUsername || document.getElementById('auth-username');
+
+  const email = emailInput?.value.trim();
+  const password = passwordInput?.value.trim();
+  const username = usernameInput?.value.trim() || email?.split('@')[0] || '학습자';
 
   if (!email || !password) {
-    alert('이메일과 비밀번호를 모두 입력해주세요.');
+    alert('아이디/이메일과 비밀번호를 모두 입력해주세요.');
     return;
   }
 
-  if (password.length < 6) {
-    alert('비밀번호는 최소 6자리 이상이어야 합니다.');
-    return;
-  }
+  let users = JSON.parse(localStorage.getItem('study_users')) || [];
 
-  try {
-    if (state.authMode === 'login') {
-      const { data, error } = await state.supabaseClient.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      alert(`🎉 반가워요, ${data.user.email} 님! 로그인되었습니다.`);
-      closeAuthModal();
-    } else {
-      const { data, error } = await state.supabaseClient.auth.signUp({ email, password });
-      if (error) throw error;
-      alert(`✉️ 회원가입 승인 또는 인증 이메일이 발송되었습니다. 로그인해주세요.`);
-      switchAuthTab('login');
+  if (state.authMode === 'signup') {
+    const existing = users.find(u => u && u.email && u.email.toLowerCase() === email.toLowerCase());
+    if (existing) {
+      alert('❌ 이미 존재하는 아이디/이메일입니다. 다른 아이디로 가입해주세요.');
+      return;
     }
-  } catch (err) {
-    alert(`❌ 인증 실패: ${err.message || err.error_description || '알 수 없는 오류가 발생했습니다.'}`);
+    const newUser = { id: 'user-' + Date.now(), email, username, password };
+    users.push(newUser);
+    localStorage.setItem('study_users', JSON.stringify(users));
+    localStorage.setItem('study_current_user', JSON.stringify(newUser));
+    state.users = users;
+    updateAuthUI(newUser);
+    alert(`🎉 회원가입이 완료되었습니다! 반가워요, ${username} 님.`);
+    closeAuthModal();
+  } else {
+    // Login
+    const user = users.find(u => u && u.email && u.email.toLowerCase() === email.toLowerCase() && u.password === password);
+    if (!user) {
+      alert('❌ 아이디 또는 비밀번호가 일치하지 않습니다.');
+      return;
+    }
+    localStorage.setItem('study_current_user', JSON.stringify(user));
+    updateAuthUI(user);
+    alert(`🎉 로그인되었습니다. 반가워요, ${user.username || user.email} 님!`);
+    closeAuthModal();
   }
 }
 
-async function handleGoogleOAuth() {
-  if (!state.supabaseClient) {
-    alert('Supabase 클라이언트가 설정되지 않았습니다.');
-    return;
-  }
-  try {
-    const { error } = await state.supabaseClient.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.href
-      }
-    });
-    if (error) throw error;
-  } catch (err) {
-    alert(`❌ Google OAuth 로그인 실패: ${err.message}`);
-  }
-}
+window.handleAuthSubmit = handleAuthSubmit;
 
-async function handleLogout() {
-  if (state.supabaseClient) {
-    await state.supabaseClient.auth.signOut();
-  }
+function handleLogout() {
+  localStorage.removeItem('study_current_user');
   updateAuthUI(null);
   alert('👋 성공적으로 로그아웃되었습니다.');
 }
+
+window.handleLogout = handleLogout;
