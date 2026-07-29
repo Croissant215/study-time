@@ -981,12 +981,23 @@ function updateAuthUI(user) {
 }
 
 function openAuthModal() {
-  DOM.authModal?.classList.remove('hidden');
+  if (DOM.authModal) {
+    DOM.authModal.classList.remove('hidden');
+  } else {
+    document.getElementById('auth-modal')?.classList.remove('hidden');
+  }
 }
 
 function closeAuthModal() {
-  DOM.authModal?.classList.add('hidden');
+  if (DOM.authModal) {
+    DOM.authModal.classList.add('hidden');
+  } else {
+    document.getElementById('auth-modal')?.classList.add('hidden');
+  }
 }
+
+window.openAuthModal = openAuthModal;
+window.closeAuthModal = closeAuthModal;
 
 function switchAuthTab(mode) {
   state.authMode = mode;
