@@ -967,13 +967,24 @@ function updateAuthUI(user) {
 }
 
 function openAuthModal() {
-  const modal = DOM.authModal || document.getElementById('auth-modal');
-  if (modal) modal.classList.remove('hidden');
+  document.getElementById('onboarding-modal')?.classList.add('hidden');
+  document.getElementById('feedback-modal')?.classList.add('hidden');
+  document.getElementById('preset-modal')?.classList.add('hidden');
+
+  const modal = document.getElementById('auth-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    modal.style.zIndex = '9999';
+  }
 }
 
 function closeAuthModal() {
-  const modal = DOM.authModal || document.getElementById('auth-modal');
-  if (modal) modal.classList.add('hidden');
+  const modal = document.getElementById('auth-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = '';
+  }
 }
 
 window.openAuthModal = openAuthModal;
