@@ -166,18 +166,10 @@ function initSupabaseClient() {
 }
 
 function openOnboardingModal() {
-  if (state.currentUser) {
-    if (DOM.onboardUserName) {
-      DOM.onboardUserName.value = state.currentUser.username || state.currentUser.email;
-      DOM.onboardUserName.readOnly = true;
-      DOM.onboardUserName.style.background = 'var(--bg-card-sub)';
-    }
-  } else {
-    if (DOM.onboardUserName) {
-      DOM.onboardUserName.value = state.profile ? state.profile.name : '열공이';
-      DOM.onboardUserName.readOnly = false;
-      DOM.onboardUserName.style.background = '';
-    }
+  if (DOM.onboardUserName) {
+    DOM.onboardUserName.value = (state.currentUser && state.currentUser.username) || (state.profile ? state.profile.name : '열공이');
+    DOM.onboardUserName.readOnly = false;
+    DOM.onboardUserName.style.background = '';
   }
 
   // Pre-select existing skill level
@@ -196,8 +188,8 @@ function checkOnboarding() {
   }
 }
 
-function saveOnboarding() {
-  const name = state.currentUser ? (state.currentUser.username || state.currentUser.email) : (DOM.onboardUserName.value.trim() || '열공이');
+async function saveOnboarding() {
+  const newName = DOM.onboardUserName ? DOM.onboardUserName.value.trim() || '열공이' : '열공이';
   const selectedSkillRadio = document.querySelector('input[name="onboard-skill"]:checked');
   const skillMult = selectedSkillRadio ? parseFloat(selectedSkillRadio.value) : 1.0;
 
@@ -205,17 +197,35 @@ function saveOnboarding() {
   if (skillMult === 1.35) skillLabel = '노베이스/기초부족 (1.35x)';
   if (skillMult === 0.75) skillLabel = '상위권/풀이빠름 (0.75x)';
 
-  state.profile = { name, skillMult, skillLabel };
+  state.profile = { name: newName, skillMult, skillLabel };
   localStorage.setItem('study_user_profile', JSON.stringify(state.profile));
 
   if (state.currentUser) {
+    state.currentUser.username = newName;
     state.currentUser.skillMult = skillMult;
     state.currentUser.skillLabel = skillLabel;
     localStorage.setItem('study_current_user', JSON.stringify(state.currentUser));
 
     let users = JSON.parse(localStorage.getItem('study_users')) || [];
-    users = users.map(u => u.id === state.currentUser.id ? { ...u, skillMult, skillLabel } : u);
+    users = users.map(u => u.id === state.currentUser.id ? { ...u, username: newName, skillMult, skillLabel } : u);
     localStorage.setItem('study_users', JSON.stringify(users));
+
+    // Update Supabase DB asynchronously
+    const SUPABASE_URL = state.supabaseConfig.url || 'https://ioyjbdhkzyatgurqvsmz.supabase.co';
+    const SUPABASE_KEY = state.supabaseConfig.anonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlveWpiZGhrenlhdGd1cnF2c216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMjc4OTMsImV4cCI6MjEwMDgwMzg5M30.noBv8DJtCmoL5JpBniS2HkvPd-rpW1Vqgnt69JKwJUo';
+    try {
+      fetch(`${SUPABASE_URL}/rest/v1/study_users?id=eq.${encodeURIComponent(state.currentUser.id)}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ username: newName, skill_mult: skillMult })
+      });
+    } catch (e) {}
+
+    updateAuthUI(state.currentUser);
   }
 
   DOM.onboardingModal?.classList.add('hidden');
@@ -1000,8 +1010,8 @@ function updateAuthUI(user) {
 
     if (DOM.onboardUserName) {
       DOM.onboardUserName.value = user.username || user.email;
-      DOM.onboardUserName.readOnly = true;
-      DOM.onboardUserName.style.background = 'var(--bg-card-sub)';
+      DOM.onboardUserName.readOnly = false;
+      DOM.onboardUserName.style.background = '';
     }
 
     const userSkillMult = user.skillMult || (state.profile ? state.profile.skillMult : 1.0);
