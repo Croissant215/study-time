@@ -739,6 +739,9 @@ function openManualFinishModal() {
 
 function openFeedbackModal(sessionData, defaultActualMin) {
   state.timer.sessionData = sessionData;
+  state.timer.pendingActualMin = defaultActualMin;
+  state.timer.pendingFeedbackSaved = false;
+
   if (DOM.modalSessionInfo) DOM.modalSessionInfo.textContent = `교재: ${sessionData.bookTitle} (${sessionData.problemCount}문제) | 예상: ${sessionData.predictedMin}분`;
   if (DOM.actualTimeInput) DOM.actualTimeInput.value = defaultActualMin;
   if (DOM.actualWrongInput) DOM.actualWrongInput.value = Math.round(sessionData.problemCount * ((parseFloat(DOM.errorRateSlider?.value) || 20) / 100));
@@ -746,13 +749,22 @@ function openFeedbackModal(sessionData, defaultActualMin) {
 }
 
 function closeFeedbackModal() {
+  if (state.timer.sessionData && !state.timer.pendingFeedbackSaved) {
+    // X 버튼이나 취소를 눌러도 기록이 사라지지 않도록 자동 보존 저장!
+    submitSessionFeedback(true);
+    return;
+  }
   DOM.feedbackModal?.classList.add('hidden');
 }
 
-async function submitSessionFeedback() {
-  const actualMin = parseInt(DOM.actualTimeInput?.value) || 1;
-  const wrongCount = parseInt(DOM.actualWrongInput?.value) || 0;
+async function submitSessionFeedback(isAutoSave = false) {
   const session = state.timer.sessionData;
+  if (!session) return;
+
+  state.timer.pendingFeedbackSaved = true;
+
+  const actualMin = parseInt(DOM.actualTimeInput?.value) || state.timer.pendingActualMin || 1;
+  const wrongCount = parseInt(DOM.actualWrongInput?.value) || 0;
 
   const predictedMin = session.predictedMin;
   const errorRatio = actualMin / predictedMin;
@@ -775,27 +787,47 @@ async function submitSessionFeedback() {
     errorRatio: (errorRatio * 100).toFixed(0) + '%'
   };
 
+  // 1. Local & Current User History Update
   state.history.unshift(newLog);
   localStorage.setItem('study_history', JSON.stringify(state.history));
+  if (state.currentUser) {
+    const userHistoryKey = `study_history_${state.currentUser.id}`;
+    let userHistory = JSON.parse(localStorage.getItem(userHistoryKey)) || [];
+    userHistory.unshift(newLog);
+    localStorage.setItem(userHistoryKey, JSON.stringify(userHistory));
+  }
 
-  if (state.supabaseClient) {
-    try {
-      await state.supabaseClient.from('study_logs').insert([{
+  // 2. Supabase DB Save
+  const SUPABASE_URL = state.supabaseConfig.url || 'https://ioyjbdhkzyatgurqvsmz.supabase.co';
+  const SUPABASE_KEY = state.supabaseConfig.anonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlveWpiZGhrenlhdGd1cnF2c216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMjc4OTMsImV4cCI6MjEwMDgwMzg5M30.noBv8DJtCmoL5JpBniS2HkvPd-rpW1Vqgnt69JKwJUo';
+  try {
+    fetch(`${SUPABASE_URL}/rest/v1/study_logs`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
         book_title: session.bookTitle,
         subject,
         problem_count: session.problemCount,
         predicted_min: predictedMin,
         actual_min: actualMin,
         wrong_count: wrongCount
-      }]);
-    } catch (e) {}
-  }
+      })
+    });
+  } catch (e) {}
 
-  closeFeedbackModal();
+  DOM.feedbackModal?.classList.add('hidden');
   renderHistory();
   recalculatePrediction();
 
-  alert(`학습 기록이 저장되었습니다!\n[${subject}] 과목 보정 알파(α): ${oldAlpha.toFixed(2)} -> ${newAlpha.toFixed(2)}`);
+  if (isAutoSave) {
+    alert(`⏱️ 측정된 공부 기록(${actualMin}분)이 삭제되지 않고 안전하게 자동 저장되었습니다!`);
+  } else {
+    alert(`🎉 학습 기록이 성공적으로 저장되었습니다!\n[${subject}] 과목 보정 알파(α): ${oldAlpha.toFixed(2)} -> ${newAlpha.toFixed(2)}`);
+  }
 }
 
 function renderPresetList() {
