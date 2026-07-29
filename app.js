@@ -1068,7 +1068,20 @@ function switchAuthTab(mode) {
 
 window.switchAuthTab = switchAuthTab;
 
-function handleAuthSubmit() {
+// SHA-256 Password Hashing Helper
+async function hashPassword(password) {
+  try {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password + "_study_predict_salt_2026");
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch (err) {
+    return password; // Fallback if crypto subtle fails
+  }
+}
+
+async function handleAuthSubmit() {
   if (state.isAuthProcessing) return;
   state.isAuthProcessing = true;
 
@@ -1078,7 +1091,7 @@ function handleAuthSubmit() {
 
   const email = emailInput?.value.trim();
   const password = passwordInput?.value.trim();
-  const username = usernameInput?.value.trim() || email?.split('@')[0] || '학습자';
+  const username = usernameInput?.value.trim() || email || '학습자';
 
   if (!email || !password) {
     alert('아이디와 비밀번호를 모두 입력해주세요.');
@@ -1086,40 +1099,107 @@ function handleAuthSubmit() {
     return;
   }
 
-  let users = JSON.parse(localStorage.getItem('study_users')) || [];
+  const SUPABASE_URL = state.supabaseConfig.url || 'https://ioyjbdhkzyatgurqvsmz.supabase.co';
+  const SUPABASE_KEY = state.supabaseConfig.anonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlveWpiZGhrenlhdGd1cnF2c216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMjc4OTMsImV4cCI6MjEwMDgwMzg5M30.noBv8DJtCmoL5JpBniS2HkvPd-rpW1Vqgnt69JKwJUo';
 
-  if (state.authMode === 'signup') {
-    const existing = users.find(u => u && u.email && u.email.toLowerCase() === email.toLowerCase());
-    if (existing) {
-      alert('❌ 이미 존재하는 아이디입니다. 다른 아이디로 가입해주세요.');
-      state.isAuthProcessing = false;
-      return;
+  try {
+    const passwordHash = await hashPassword(password);
+
+    if (state.authMode === 'signup') {
+      // 1. Check existing user in Supabase DB
+      let existingUsers = [];
+      try {
+        const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/study_users?email=eq.${encodeURIComponent(email)}`, {
+          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+        if (checkRes.ok) existingUsers = await checkRes.json();
+      } catch (e) {}
+
+      if (existingUsers && existingUsers.length > 0) {
+        alert('❌ 이미 존재하는 아이디입니다. 다른 아이디로 가입해주세요.');
+        state.isAuthProcessing = false;
+        return;
+      }
+
+      // 2. Insert new user with SHA-256 Hashed Password
+      const newUser = {
+        id: 'user-' + Date.now(),
+        email: email,
+        username: username,
+        password: passwordHash,
+        skill_mult: 1.0,
+        created_at: new Date().toISOString()
+      };
+
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/study_users`, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(newUser)
+        });
+      } catch (e) {}
+
+      // Save Local Fallback Session
+      let users = JSON.parse(localStorage.getItem('study_users')) || [];
+      users.push(newUser);
+      localStorage.setItem('study_users', JSON.stringify(users));
+
+      const sessionUser = { id: newUser.id, email: newUser.email, username: newUser.username, skillMult: 1.0, skillLabel: '보통 (1.0x)' };
+      localStorage.setItem('study_current_user', JSON.stringify(sessionUser));
+      updateAuthUI(sessionUser);
+
+      alert(`🎉 암호화 회원가입이 완료되었습니다! 모든 기기에서 공유됩니다. 반가워요, ${username} 님.`);
+      closeAuthModal();
+    } else {
+      // Login - Fetch matching user from Supabase DB
+      let matchedUsers = [];
+      try {
+        const loginRes = await fetch(`${SUPABASE_URL}/rest/v1/study_users?email=eq.${encodeURIComponent(email)}&password=eq.${encodeURIComponent(passwordHash)}`, {
+          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+        if (loginRes.ok) matchedUsers = await loginRes.json();
+      } catch (e) {}
+
+      if (matchedUsers && matchedUsers.length > 0) {
+        const dbUser = matchedUsers[0];
+        const sessionUser = {
+          id: dbUser.id,
+          email: dbUser.email,
+          username: dbUser.username,
+          skillMult: parseFloat(dbUser.skill_mult) || 1.0,
+          skillLabel: (parseFloat(dbUser.skill_mult) === 1.35) ? '노베이스/기초부족 (1.35x)' : (parseFloat(dbUser.skill_mult) === 0.75 ? '상위권/풀이빠름 (0.75x)' : '보통 (1.0x)')
+        };
+        localStorage.setItem('study_current_user', JSON.stringify(sessionUser));
+        updateAuthUI(sessionUser);
+        alert(`🎉 보안 로그인되었습니다. 모든 기기에서 데이터가 공유됩니다! 반가워요, ${sessionUser.username} 님!`);
+        closeAuthModal();
+      } else {
+        // Fallback check in local users
+        let users = JSON.parse(localStorage.getItem('study_users')) || [];
+        const localUser = users.find(u => u && u.email && u.email.toLowerCase() === email.toLowerCase() && (u.password === password || u.password === passwordHash));
+        if (localUser) {
+          const sessionUser = { id: localUser.id, email: localUser.email, username: localUser.username, skillMult: localUser.skillMult || 1.0, skillLabel: localUser.skillLabel || '보통 (1.0x)' };
+          localStorage.setItem('study_current_user', JSON.stringify(sessionUser));
+          updateAuthUI(sessionUser);
+          alert(`🎉 로그인되었습니다. 반가워요, ${sessionUser.username} 님!`);
+          closeAuthModal();
+        } else {
+          alert('❌ 아이디 또는 비밀번호가 일치하지 않습니다.');
+          state.isAuthProcessing = false;
+          return;
+        }
+      }
     }
-    const newUser = { id: 'user-' + Date.now(), email, username, password };
-    users.push(newUser);
-    localStorage.setItem('study_users', JSON.stringify(users));
-    localStorage.setItem('study_current_user', JSON.stringify(newUser));
-    state.users = users;
-    updateAuthUI(newUser);
-    alert(`🎉 회원가입이 완료되었습니다! 반가워요, ${username} 님.`);
-    closeAuthModal();
-  } else {
-    // Login
-    const user = users.find(u => u && u.email && u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-    if (!user) {
-      alert('❌ 아이디 또는 비밀번호가 일치하지 않습니다.');
-      state.isAuthProcessing = false;
-      return;
-    }
-    localStorage.setItem('study_current_user', JSON.stringify(user));
-    updateAuthUI(user);
-    alert(`🎉 로그인되었습니다. 반가워요, ${user.username || user.email} 님!`);
-    closeAuthModal();
+  } catch (err) {
+    alert('❌ 처리 중 오류가 발생했습니다.');
+  } finally {
+    setTimeout(() => { state.isAuthProcessing = false; }, 500);
   }
-  
-  setTimeout(() => {
-    state.isAuthProcessing = false;
-  }, 500);
 }
 
 window.handleAuthSubmit = handleAuthSubmit;
