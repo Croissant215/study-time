@@ -151,6 +151,39 @@ document.addEventListener('DOMContentLoaded', () => {
   recalculatePrediction();
 });
 
+// --- Custom Toast Notification UI System ---
+function showToast(message, type = 'info', duration = 3200) {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = `toast-message toast-${type}`;
+  
+  let iconHtml = '<i class="fa-solid fa-circle-info"></i>';
+  if (type === 'success') iconHtml = '<i class="fa-solid fa-circle-check" style="color:#2ecc71;"></i>';
+  if (type === 'error') iconHtml = '<i class="fa-solid fa-circle-exclamation" style="color:#e74c3c;"></i>';
+
+  toast.innerHTML = `${iconHtml} <span>${message}</span>`;
+  container.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.classList.add('show');
+  });
+
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => {
+      toast.remove();
+    }, 400);
+  }, duration);
+}
+
+window.showToast = showToast;
+
 function initSupabaseClient() {
   if (!state.supabaseConfig.url || !state.supabaseConfig.anonKey) {
     state.supabaseConfig.url = 'https://ioyjbdhkzyatgurqvsmz.supabase.co';
@@ -249,7 +282,7 @@ async function saveOnboarding() {
   DOM.onboardingModal?.classList.add('hidden');
   updateProfileBar();
   recalculatePrediction();
-  alert(`✅ 프로필 및 실력 설정이 Supabase DB와 로컬에 정상 보관되었습니다!\n닉네임: ${newName}\n실력 레벨: ${skillLabel}`);
+  showToast(`✅ 프로필 및 실력 설정이 저장되었습니다!\n닉네임: ${newName} | 실력: ${skillLabel}`, 'success');
 }
 
 function updateProfileBar() {
@@ -843,9 +876,9 @@ async function submitSessionFeedback(isAutoSave = false) {
   recalculatePrediction();
 
   if (isAutoSave) {
-    alert(`⏱️ 측정된 공부 기록(${actualMin}분)이 삭제되지 않고 안전하게 자동 저장되었습니다!`);
+    showToast(`⏱️ 측정된 공부 기록(${actualMin}분)이 삭제되지 않고 안전하게 자동 저장되었습니다!`, 'info');
   } else {
-    alert(`🎉 학습 기록이 성공적으로 저장되었습니다!\n[${subject}] 과목 보정 알파(α): ${oldAlpha.toFixed(2)} -> ${newAlpha.toFixed(2)}`);
+    showToast(`🎉 학습 기록이 성공적으로 저장되었습니다!\n[${subject}] 과목 보정 알파(α): ${oldAlpha.toFixed(2)} -> ${newAlpha.toFixed(2)}`, 'success');
   }
 }
 
@@ -1197,7 +1230,7 @@ async function handleAuthSubmit() {
   const username = usernameInput?.value.trim() || email || '학습자';
 
   if (!email || !password) {
-    alert('아이디와 비밀번호를 모두 입력해주세요.');
+    showToast('아이디와 비밀번호를 모두 입력해주세요.', 'error');
     state.isAuthProcessing = false;
     return;
   }
@@ -1219,7 +1252,7 @@ async function handleAuthSubmit() {
       } catch (e) {}
 
       if (existingUsers && existingUsers.length > 0) {
-        alert('❌ 이미 존재하는 아이디입니다. 다른 아이디로 가입해주세요.');
+        showToast('❌ 이미 존재하는 아이디입니다. 다른 아이디로 가입해주세요.', 'error');
         state.isAuthProcessing = false;
         return;
       }
@@ -1256,7 +1289,7 @@ async function handleAuthSubmit() {
       localStorage.setItem('study_current_user', JSON.stringify(sessionUser));
       updateAuthUI(sessionUser);
 
-      alert(`🎉 암호화 회원가입이 완료되었습니다! 모든 기기에서 공유됩니다. 반가워요, ${username} 님.`);
+      showToast(`🎉 회원가입 완료! 모든 기기에서 공유됩니다. 반가워요, ${username} 님.`, 'success');
       closeAuthModal();
     } else {
       // Login - Fetch matching user from Supabase DB
@@ -1279,7 +1312,7 @@ async function handleAuthSubmit() {
         };
         localStorage.setItem('study_current_user', JSON.stringify(sessionUser));
         updateAuthUI(sessionUser);
-        alert(`🎉 보안 로그인되었습니다. 모든 기기에서 데이터가 공유됩니다! 반가워요, ${sessionUser.username} 님!`);
+        showToast(`🎉 보안 로그인되었습니다! 반가워요, ${sessionUser.username} 님!`, 'success');
         closeAuthModal();
       } else {
         // Fallback check in local users
@@ -1289,17 +1322,17 @@ async function handleAuthSubmit() {
           const sessionUser = { id: localUser.id, email: localUser.email, username: localUser.username, skillMult: localUser.skillMult || 1.0, skillLabel: localUser.skillLabel || '보통 (1.0x)' };
           localStorage.setItem('study_current_user', JSON.stringify(sessionUser));
           updateAuthUI(sessionUser);
-          alert(`🎉 로그인되었습니다. 반가워요, ${sessionUser.username} 님!`);
+          showToast(`🎉 로그인되었습니다. 반가워요, ${sessionUser.username} 님!`, 'success');
           closeAuthModal();
         } else {
-          alert('❌ 아이디 또는 비밀번호가 일치하지 않습니다.');
+          showToast('❌ 아이디 또는 비밀번호가 일치하지 않습니다.', 'error');
           state.isAuthProcessing = false;
           return;
         }
       }
     }
   } catch (err) {
-    alert('❌ 처리 중 오류가 발생했습니다.');
+    showToast('❌ 처리 중 오류가 발생했습니다.', 'error');
   } finally {
     setTimeout(() => { state.isAuthProcessing = false; }, 500);
   }
@@ -1312,7 +1345,7 @@ function handleLogout() {
   state.isLoggingOut = true;
   localStorage.removeItem('study_current_user');
   updateAuthUI(null);
-  alert('👋 성공적으로 로그아웃되었습니다.');
+  showToast('👋 성공적으로 로그아웃되었습니다.', 'info');
   setTimeout(() => {
     state.isLoggingOut = false;
   }, 500);
