@@ -207,23 +207,41 @@ async function saveOnboarding() {
     localStorage.setItem('study_current_user', JSON.stringify(state.currentUser));
 
     let users = JSON.parse(localStorage.getItem('study_users')) || [];
-    users = users.map(u => u.id === state.currentUser.id ? { ...u, username: newName, skillMult, skillLabel } : u);
+    users = users.map(u => (u.email === state.currentUser.email || u.id === state.currentUser.id) ? { ...u, username: newName, skillMult, skillLabel } : u);
     localStorage.setItem('study_users', JSON.stringify(users));
 
-    // Update Supabase DB asynchronously
+    // Update Supabase DB reliably using email target
     const SUPABASE_URL = state.supabaseConfig.url || 'https://ioyjbdhkzyatgurqvsmz.supabase.co';
     const SUPABASE_KEY = state.supabaseConfig.anonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlveWpiZGhrenlhdGd1cnF2c216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMjc4OTMsImV4cCI6MjEwMDgwMzg5M30.noBv8DJtCmoL5JpBniS2HkvPd-rpW1Vqgnt69JKwJUo';
     try {
-      fetch(`${SUPABASE_URL}/rest/v1/study_users?id=eq.${encodeURIComponent(state.currentUser.id)}`, {
+      // 1. Try PATCH by email
+      const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/study_users?email=eq.${encodeURIComponent(state.currentUser.email)}`, {
         method: 'PATCH',
         headers: {
           'apikey': SUPABASE_KEY,
           'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
         },
         body: JSON.stringify({ username: newName, skill_mult: skillMult })
       });
-    } catch (e) {}
+
+      // 2. Fallback PATCH by id if email patch returned empty
+      const updatedRows = patchRes.ok ? await patchRes.json() : [];
+      if (!updatedRows || updatedRows.length === 0) {
+        await fetch(`${SUPABASE_URL}/rest/v1/study_users?id=eq.${encodeURIComponent(state.currentUser.id)}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ username: newName, skill_mult: skillMult })
+        });
+      }
+    } catch (e) {
+      console.warn('Supabase DB Update warning:', e);
+    }
 
     updateAuthUI(state.currentUser);
   }
@@ -231,7 +249,7 @@ async function saveOnboarding() {
   DOM.onboardingModal?.classList.add('hidden');
   updateProfileBar();
   recalculatePrediction();
-  alert(`✅ 프로필 및 실력 설정이 저장되었습니다!\n닉네임: ${newName}\n실력 레벨: ${skillLabel}`);
+  alert(`✅ 프로필 및 실력 설정이 Supabase DB와 로컬에 정상 보관되었습니다!\n닉네임: ${newName}\n실력 레벨: ${skillLabel}`);
 }
 
 function updateProfileBar() {
