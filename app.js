@@ -231,6 +231,7 @@ async function saveOnboarding() {
   DOM.onboardingModal?.classList.add('hidden');
   updateProfileBar();
   recalculatePrediction();
+  alert(`✅ 프로필 및 실력 설정이 저장되었습니다!\n닉네임: ${newName}\n실력 레벨: ${skillLabel}`);
 }
 
 function updateProfileBar() {
@@ -1025,10 +1026,30 @@ function sendBackgroundNotification(title, options) {
 }
 
 // --- Custom Local Authentication Engine ---
-function checkAuthSession() {
+async function checkAuthSession() {
   const users = JSON.parse(localStorage.getItem('study_users')) || [];
-  const currentUser = JSON.parse(localStorage.getItem('study_current_user')) || null;
+  let currentUser = JSON.parse(localStorage.getItem('study_current_user')) || null;
   state.users = users;
+
+  if (currentUser && currentUser.id) {
+    const SUPABASE_URL = state.supabaseConfig.url || 'https://ioyjbdhkzyatgurqvsmz.supabase.co';
+    const SUPABASE_KEY = state.supabaseConfig.anonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlveWpiZGhrenlhdGd1cnF2c216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMjc4OTMsImV4cCI6MjEwMDgwMzg5M30.noBv8DJtCmoL5JpBniS2HkvPd-rpW1Vqgnt69JKwJUo';
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/study_users?id=eq.${encodeURIComponent(currentUser.id)}`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (res.ok) {
+        const dbUsers = await res.json();
+        if (dbUsers && dbUsers.length > 0) {
+          const dbUser = dbUsers[0];
+          currentUser.username = dbUser.username || currentUser.username;
+          currentUser.skillMult = parseFloat(dbUser.skill_mult) || currentUser.skillMult || 1.0;
+          localStorage.setItem('study_current_user', JSON.stringify(currentUser));
+        }
+      }
+    } catch (e) {}
+  }
+
   updateAuthUI(currentUser);
 }
 
