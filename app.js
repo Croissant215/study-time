@@ -1000,6 +1000,26 @@ function checkAuthSession() {
   updateAuthUI(currentUser);
 }
 
+function syncGuestDataToUser(user) {
+  if (!user) return;
+  const userHistoryKey = `study_history_${user.id}`;
+  let userHistory = JSON.parse(localStorage.getItem(userHistoryKey)) || [];
+
+  if (state.history && state.history.length > 0) {
+    const existingIds = new Set(userHistory.map(h => h.id));
+    const newGuestLogs = state.history.filter(h => !existingIds.has(h.id));
+    if (newGuestLogs.length > 0) {
+      userHistory = [...newGuestLogs, ...userHistory];
+    }
+  }
+
+  state.history = userHistory;
+  localStorage.setItem(userHistoryKey, JSON.stringify(userHistory));
+  localStorage.setItem('study_history', JSON.stringify(userHistory));
+
+  renderHistory();
+}
+
 function updateAuthUI(user) {
   state.currentUser = user;
   if (user) {
@@ -1017,6 +1037,8 @@ function updateAuthUI(user) {
     const userSkillMult = user.skillMult || (state.profile ? state.profile.skillMult : 1.0);
     const radio = document.querySelector(`input[name="onboard-skill"][value="${userSkillMult}"]`);
     if (radio) radio.checked = true;
+
+    syncGuestDataToUser(user);
   } else {
     if (DOM.btnOpenAuth) DOM.btnOpenAuth.classList.remove('hidden');
     if (DOM.userAuthBadge) DOM.userAuthBadge.classList.add('hidden');
