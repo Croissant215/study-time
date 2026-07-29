@@ -165,18 +165,41 @@ function initSupabaseClient() {
   }
 }
 
+function openOnboardingModal() {
+  if (state.currentUser) {
+    if (DOM.onboardUserName) {
+      DOM.onboardUserName.value = state.currentUser.username || state.currentUser.email;
+      DOM.onboardUserName.readOnly = true;
+      DOM.onboardUserName.style.background = 'var(--bg-card-sub)';
+    }
+  } else {
+    if (DOM.onboardUserName) {
+      DOM.onboardUserName.value = state.profile ? state.profile.name : '열공이';
+      DOM.onboardUserName.readOnly = false;
+      DOM.onboardUserName.style.background = '';
+    }
+  }
+
+  // Pre-select existing skill level
+  const currentSkillMult = (state.currentUser && state.currentUser.skillMult) || (state.profile && state.profile.skillMult) || 1.0;
+  const radioToSelect = document.querySelector(`input[name="onboard-skill"][value="${currentSkillMult}"]`);
+  if (radioToSelect) radioToSelect.checked = true;
+
+  DOM.onboardingModal?.classList.remove('hidden');
+}
+
 function checkOnboarding() {
-  if (!state.profile) {
-    DOM.onboardingModal?.classList.remove('hidden');
+  if (!state.profile && !state.currentUser) {
+    openOnboardingModal();
   } else {
     updateProfileBar();
   }
 }
 
 function saveOnboarding() {
-  const name = DOM.onboardUserName.value.trim() || '열공이';
-  const selectedSkill = document.querySelector('input[name="onboard-skill"]:checked').value;
-  const skillMult = parseFloat(selectedSkill);
+  const name = state.currentUser ? (state.currentUser.username || state.currentUser.email) : (DOM.onboardUserName.value.trim() || '열공이');
+  const selectedSkillRadio = document.querySelector('input[name="onboard-skill"]:checked');
+  const skillMult = selectedSkillRadio ? parseFloat(selectedSkillRadio.value) : 1.0;
 
   let skillLabel = '보통 (1.0x)';
   if (skillMult === 1.35) skillLabel = '노베이스/기초부족 (1.35x)';
@@ -184,17 +207,30 @@ function saveOnboarding() {
 
   state.profile = { name, skillMult, skillLabel };
   localStorage.setItem('study_user_profile', JSON.stringify(state.profile));
+
+  if (state.currentUser) {
+    state.currentUser.skillMult = skillMult;
+    state.currentUser.skillLabel = skillLabel;
+    localStorage.setItem('study_current_user', JSON.stringify(state.currentUser));
+
+    let users = JSON.parse(localStorage.getItem('study_users')) || [];
+    users = users.map(u => u.id === state.currentUser.id ? { ...u, skillMult, skillLabel } : u);
+    localStorage.setItem('study_users', JSON.stringify(users));
+  }
+
   DOM.onboardingModal?.classList.add('hidden');
   updateProfileBar();
   recalculatePrediction();
 }
 
 function updateProfileBar() {
-  if (state.profile) {
-    if (DOM.barUserName) DOM.barUserName.textContent = state.profile.name;
-    if (DOM.barSkillLevel) DOM.barSkillLevel.textContent = `실력 레벨: ${state.profile.skillLabel}`;
-    if (DOM.skillMultVal) DOM.skillMultVal.textContent = `${state.profile.skillMult}x`;
-  }
+  const name = state.currentUser ? (state.currentUser.username || state.currentUser.email) : (state.profile ? state.profile.name : '열공이');
+  const skillLabel = (state.currentUser && state.currentUser.skillLabel) || (state.profile ? state.profile.skillLabel : '보통 (1.0x)');
+  const skillMult = (state.currentUser && state.currentUser.skillMult) || (state.profile ? state.profile.skillMult : 1.0);
+
+  if (DOM.barUserName) DOM.barUserName.textContent = name;
+  if (DOM.barSkillLevel) DOM.barSkillLevel.textContent = `실력 레벨: ${skillLabel}`;
+  if (DOM.skillMultVal) DOM.skillMultVal.textContent = `${skillMult}x`;
 }
 
 function setupEventListeners() {
@@ -208,7 +244,7 @@ function setupEventListeners() {
   });
 
   DOM.btnSaveOnboarding?.addEventListener('click', saveOnboarding);
-  DOM.btnReOnboard?.addEventListener('click', () => DOM.onboardingModal?.classList.remove('hidden'));
+  DOM.btnReOnboard?.addEventListener('click', openOnboardingModal);
 
   DOM.btnExportData?.addEventListener('click', exportData);
   DOM.importFileInput?.addEventListener('change', importData);
@@ -961,11 +997,29 @@ function updateAuthUI(user) {
     if (DOM.userAuthBadge) DOM.userAuthBadge.classList.remove('hidden');
     if (DOM.userEmailDisplay) DOM.userEmailDisplay.innerHTML = `<i class="fa-solid fa-user-check"></i> ${user.username || user.email}`;
     if (DOM.barUserName) DOM.barUserName.textContent = user.username || user.email;
+
+    if (DOM.onboardUserName) {
+      DOM.onboardUserName.value = user.username || user.email;
+      DOM.onboardUserName.readOnly = true;
+      DOM.onboardUserName.style.background = 'var(--bg-card-sub)';
+    }
+
+    const userSkillMult = user.skillMult || (state.profile ? state.profile.skillMult : 1.0);
+    const radio = document.querySelector(`input[name="onboard-skill"][value="${userSkillMult}"]`);
+    if (radio) radio.checked = true;
   } else {
     if (DOM.btnOpenAuth) DOM.btnOpenAuth.classList.remove('hidden');
     if (DOM.userAuthBadge) DOM.userAuthBadge.classList.add('hidden');
-    if (DOM.barUserName && state.profile) DOM.barUserName.textContent = state.profile.name || '열공이';
+    if (DOM.barUserName) DOM.barUserName.textContent = state.profile ? state.profile.name : '열공이';
+
+    if (DOM.onboardUserName) {
+      DOM.onboardUserName.value = state.profile ? state.profile.name : '열공이';
+      DOM.onboardUserName.readOnly = false;
+      DOM.onboardUserName.style.background = '';
+    }
   }
+  updateProfileBar();
+  recalculatePrediction();
 }
 
 function openAuthModal() {
